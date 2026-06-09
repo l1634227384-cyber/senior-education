@@ -33,7 +33,10 @@ class Settings:
     EMBEDDING_MODEL: str = "text-embedding-3-small"
 
     # 数据库配置
-    DATABASE_URL: str = f"sqlite+aiosqlite:///{BASE_DIR / 'data' / 'learning_system.db'}"
+    DATABASE_URL: str = os.getenv(
+    "DATABASE_URL",
+    "mysql+aiomysql://admin:admin123@10.82.226.119:3306/edu_agent"
+    )
 
     # 文件存储
     UPLOAD_DIR: Path = BASE_DIR / "uploads"
