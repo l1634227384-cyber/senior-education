@@ -218,6 +218,162 @@
             transition: width 0.5s;
         }
 
+        /* 对话历史侧边栏 */
+        .conversation-sidebar {
+            width: 280px;
+            background: var(--bg-card);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: width 0.2s;
+            position: relative;
+        }
+        .conversation-sidebar.collapsed {
+            width: 0;
+            border-right: none;
+            overflow: hidden;
+        }
+        .conv-sidebar-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .conv-sidebar-header h3 {
+            font-size: 14px;
+            color: var(--text);
+            margin: 0;
+        }
+        .conv-new-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .conv-new-btn:hover {
+            background: var(--primary-dark);
+            transform: scale(1.05);
+        }
+        .conv-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        .conv-item {
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            margin-bottom: 4px;
+            transition: all 0.15s;
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .conv-item:hover {
+            background: var(--bg);
+        }
+        .conv-item.active {
+            background: #EEF2FF;
+            border: 1px solid #C7D2FE;
+        }
+        .conv-item .conv-icon {
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        .conv-item .conv-info {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+        }
+        .conv-item .conv-title {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .conv-item .conv-meta {
+            font-size: 11px;
+            color: var(--text-light);
+            margin-top: 2px;
+        }
+        .conv-item .conv-delete {
+            opacity: 0;
+            background: none;
+            border: none;
+            color: var(--text-light);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 2px 4px;
+            border-radius: 4px;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+        .conv-item:hover .conv-delete {
+            opacity: 1;
+        }
+        .conv-item .conv-delete:hover {
+            color: var(--danger);
+            background: #FEE2E2;
+        }
+        .conv-empty {
+            text-align: center;
+            padding: 24px 16px;
+            color: var(--text-light);
+            font-size: 13px;
+        }
+        .conv-toggle-btn {
+            background: none;
+            border: none;
+            color: var(--text-light);
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.15s;
+        }
+        .conv-toggle-btn:hover {
+            color: var(--text);
+            background: var(--bg);
+        }
+        .conv-expand-btn {
+            position: fixed;
+            left: 320px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-light);
+            cursor: pointer;
+            font-size: 16px;
+            padding: 12px 4px;
+            border-radius: 0 8px 8px 0;
+            transition: all 0.15s;
+            z-index: 50;
+            display: none;
+            box-shadow: 2px 0 4px rgba(0,0,0,0.05);
+        }
+        .conv-expand-btn.visible {
+            display: block;
+        }
+        .conv-expand-btn:hover {
+            color: var(--primary);
+            background: #EEF2FF;
+        }
+
         /* 内容区 */
         .content {
             flex: 1;
@@ -421,6 +577,130 @@
             margin: 0 auto 16px;
         }
 
+        /* 画像页面 */
+        .profile-page {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .profile-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+            padding: 20px;
+            background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+            border-radius: var(--radius);
+        }
+        .profile-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            flex-shrink: 0;
+        }
+        .profile-header-info h2 {
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+        .profile-header-info p {
+            color: var(--text-light);
+            font-size: 14px;
+        }
+        .profile-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+        }
+        .profile-dimension-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+        .profile-dimension-card .dim-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-weight: 600;
+            font-size: 15px;
+        }
+        .profile-dimension-card .dim-header .dim-icon {
+            font-size: 20px;
+        }
+        .profile-dimension-card .dim-content {
+            font-size: 13px;
+            line-height: 1.8;
+        }
+        .profile-dimension-card .score-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 6px 0;
+        }
+        .profile-dimension-card .score-bar .bar {
+            flex: 1;
+            height: 8px;
+            background: #E2E8F0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .profile-dimension-card .score-bar .bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s;
+        }
+        .profile-dimension-card .score-bar .bar-fill.high { background: var(--success); }
+        .profile-dimension-card .score-bar .bar-fill.medium { background: var(--accent); }
+        .profile-dimension-card .score-bar .bar-fill.low { background: var(--danger); }
+        .profile-dimension-card .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin: 2px 4px 2px 0;
+            background: #EEF2FF;
+            color: var(--primary);
+        }
+        .profile-dimension-card .tag.secondary {
+            background: #F0F9FF;
+            color: var(--secondary);
+        }
+        .profile-dimension-card .tag.accent {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+        .profile-summary-box {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #F0F9FF, #E0F2FE);
+            border-radius: var(--radius);
+            padding: 20px;
+            border: 1px solid #BAE6FD;
+        }
+        .profile-summary-box h3 {
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+        .profile-summary-box p {
+            font-size: 14px;
+            line-height: 1.8;
+            color: var(--text);
+        }
+        .profile-update-time {
+            text-align: right;
+            font-size: 12px;
+            color: var(--text-light);
+            margin-top: 16px;
+            grid-column: 1 / -1;
+        }
+
         /* 登录/注册模态框 */
         .auth-modal-overlay {
             position: fixed;
@@ -534,7 +814,6 @@
         .modal .content-body {
             font-size: 14px;
             line-height: 1.8;
-            white-space: pre-wrap;
             word-break: break-word;
             overflow-y: auto;
             flex: 1;
@@ -667,6 +946,7 @@
         </div>
         <div class="nav-links">
             <button class="nav-btn active" onclick="switchTab('chat')">💬 对话</button>
+            <button class="nav-btn" onclick="switchTab('profile')">🧠 学习画像</button>
             <button class="nav-btn" onclick="switchTab('resources')">📚 资源</button>
             <button class="nav-btn" onclick="switchTab('path')">🗺️ 学习路径</button>
             <button class="nav-btn" onclick="switchTab('evaluation')">📊 评估</button>
@@ -733,10 +1013,28 @@
             </div>
         </aside>
 
+        <!-- 对话历史侧边栏 -->
+        <aside class="conversation-sidebar" id="conversationSidebar">
+            <div class="conv-sidebar-header">
+                <h3>💬 对话历史</h3>
+                <div style="display:flex;gap:4px;align-items:center;">
+                    <button class="conv-new-btn" onclick="createNewConversation()" title="新建对话">+</button>
+                    <button class="conv-toggle-btn" onclick="toggleConversationSidebar()" title="收起">◀</button>
+                </div>
+            </div>
+            <div class="conv-list" id="conversationList">
+                <div class="conv-empty">暂无对话记录</div>
+            </div>
+        </aside>
+
+        <!-- 展开对话侧边栏按钮（侧边栏折叠时显示） -->
+        <button class="conv-expand-btn" id="convExpandBtn" onclick="toggleConversationSidebar()" title="展开对话历史">▶</button>
+
         <!-- 内容区 -->
         <main class="content">
             <div class="content-tabs" id="contentTabs">
                 <button class="content-tab active" data-tab="chat">💬 智能对话</button>
+                <button class="content-tab" data-tab="profile">🧠 学习画像</button>
                 <button class="content-tab" data-tab="resources">📚 学习资源</button>
                 <button class="content-tab" data-tab="path">🗺️ 学习路径</button>
                 <button class="content-tab" data-tab="evaluation">📊 学习评估</button>
@@ -785,6 +1083,15 @@
                 </div>
             </div>
 
+            <!-- 画像区 -->
+            <div class="profile-page" id="profileView" style="display:none;">
+                <div style="text-align:center;padding:40px;color:var(--text-light);">
+                    <div style="font-size:48px;">🧠</div>
+                    <p>请先登录，通过自然语言对话构建你的学习画像</p>
+                    <p style="font-size:13px;margin-top:8px;">画像将包含：知识基础、认知风格、学习偏好、易错点、学习节奏、目标导向、学科兴趣、学习习惯等维度</p>
+                </div>
+            </div>
+
             <!-- 评估区 -->
             <div class="evaluation-container" id="evaluationView" style="display:none;">
                 <div style="text-align:center;padding:40px;color:var(--text-light);">
@@ -799,6 +1106,7 @@
     <div class="modal-overlay" id="resourceModal" style="display:none;" onclick="closeModal(event)">
         <div class="modal" id="resourceModalBox" onclick="event.stopPropagation()">
             <div class="modal-header">
+                <h2 id="modalTitle" style="margin:0;font-size:18px;"></h2>
                 <div class="modal-actions">
                     <button onclick="toggleModalSize()" title="切换全屏/半屏">⛶ 全屏</button>
                     <button onclick="document.getElementById('resourceModal').style.display='none'" title="关闭">&times;</button>
@@ -823,6 +1131,8 @@
         let allResources = [];
         let learningPath = null;
         let evaluations = [];
+        let currentConversationId = null;
+        let conversationSidebarVisible = true;
 
         // 切换登录/注册标签
         function switchAuthTab(tab) {
@@ -889,6 +1199,7 @@
                 await loadStudentResources();
                 await loadSystemStats();
                 await loadLearningProgress();
+                await loadConversationList();
             } catch (err) {
                 alert('注册失败: ' + err.message);
             } finally {
@@ -937,6 +1248,7 @@
                 await loadStudentResources();
                 await loadSystemStats();
                 await loadLearningProgress();
+                await loadConversationList();
             } catch (err) {
                 alert('登录失败: ' + err.message);
             } finally {
@@ -967,6 +1279,7 @@
                 allResources = [];
                 learningPath = null;
                 evaluations = [];
+                currentConversationId = null;
                 
                 // 关闭 WebSocket 连接
                 if (ws) {
@@ -993,6 +1306,9 @@
                         </div>
                     </div>
                 `;
+                
+                // 清空对话列表
+                document.getElementById('conversationList').innerHTML = '<div class="conv-empty">暂无对话记录</div>';
                 
                 // 清空其他视图
                 document.getElementById('resourcesView').innerHTML = `
@@ -1056,14 +1372,19 @@
         function switchTab(tab) {
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.content-tab').forEach(t => t.classList.remove('active'));
-            
+
             document.querySelector(`.nav-btn[onclick="switchTab('${tab}')"]`)?.classList.add('active');
             document.querySelector(`.content-tab[data-tab="${tab}"]`)?.classList.add('active');
-            
+
             document.getElementById('chatView').style.display = tab === 'chat' ? 'flex' : 'none';
+            document.getElementById('profileView').style.display = tab === 'profile' ? 'block' : 'none';
             document.getElementById('resourcesView').style.display = tab === 'resources' ? 'grid' : 'none';
             document.getElementById('pathView').style.display = tab === 'path' ? 'block' : 'none';
             document.getElementById('evaluationView').style.display = tab === 'evaluation' ? 'block' : 'none';
+
+            if (tab === 'profile' && currentProfile) {
+                renderProfilePage(currentProfile);
+            }
         }
 
         // 标签点击事件
@@ -1109,7 +1430,7 @@
             return map[cs.type] || cs.type;
         }
 
-        // 渲染画像
+        // 渲染侧边栏画像摘要
         function renderProfile(profile) {
             const display = document.getElementById('profileDisplay');
             const dims = document.getElementById('profileDimensions');
@@ -1121,28 +1442,10 @@
 
             display.style.display = 'block';
 
-            const kb = profile.knowledge_base || {};
             const cs = profile.cognitive_style || {};
             const lp = profile.learning_preference || {};
-            const habits = profile.learning_habits || {};
-            const pace = profile.learning_pace || {};
-            const interests = profile.subject_interests || {};
 
             let html = '';
-
-            // 知识基础
-            const kbEntries = Object.entries(kb).filter(([k]) => !k.startsWith('_'));
-            if (kbEntries.length > 0) {
-                html += '<div style="margin-bottom:8px;font-weight:500;font-size:12px;color:var(--text-light);">📚 知识基础</div>';
-                for (const [subject, score] of kbEntries) {
-                    const s = typeof score === 'number' ? score : 0;
-                    html += `<div class="dimension">
-                        <span>${subject}</span>
-                        <div class="dim-bar"><div class="dim-fill" style="width:${Math.min(s,100)}%"></div></div>
-                        <span>${s}</span>
-                    </div>`;
-                }
-            }
 
             // 认知风格（增强展示）
             const styleLabel = getCognitiveStyleLabel(cs);
@@ -1161,24 +1464,204 @@
                 html += `<div style="margin:8px 0;font-size:12px;">🎯 偏好格式: ${labels}</div>`;
             }
 
-            // 学习节奏
-            if (pace.speed && pace.speed !== 'moderate') {
-                const speedMap = { 'fast': '较快', 'slow': '较慢', 'moderate': '适中' };
-                html += `<div style="margin:8px 0;font-size:12px;">⏱️ 学习节奏: ${speedMap[pace.speed] || pace.speed}</div>`;
-            }
-
-            // 学科兴趣
-            const primary = interests.primary || [];
-            if (primary.length > 0) {
-                html += `<div style="margin:8px 0;font-size:12px;">⭐ 兴趣领域: ${primary.join('、')}</div>`;
-            }
-
-            // 画像摘要
-            if (profile.profile_summary && profile.profile_summary !== '新学生，画像待构建') {
-                html += `<div style="margin-top:10px;font-size:12px;color:var(--text-light);line-height:1.6;">${profile.profile_summary.substring(0, 120)}...</div>`;
-            }
-
             dims.innerHTML = html || '<div style="font-size:12px;">画像构建中，请继续对话...</div>';
+        }
+
+        // 渲染完整画像页面（6+维度）
+        function renderProfilePage(profile) {
+            const container = document.getElementById('profileView');
+            if (!profile || Object.keys(profile).length === 0) {
+                container.innerHTML = `
+                    <div style="text-align:center;padding:40px;color:var(--text-light);">
+                        <div style="font-size:48px;">🧠</div>
+                        <p>请先登录，通过自然语言对话构建你的学习画像</p>
+                        <p style="font-size:13px;margin-top:8px;">在「智能对话」中聊聊你的专业、学习目标、学习习惯等，系统会自动抽取特征</p>
+                    </div>`;
+                return;
+            }
+
+            const kb = profile.knowledge_base || {};
+            const cs = profile.cognitive_style || {};
+            const lp = profile.learning_preference || {};
+            const ep = profile.error_patterns || {};
+            const pace = profile.learning_pace || {};
+            const goals = profile.goal_orientation || {};
+            const interests = profile.subject_interests || {};
+            const habits = profile.learning_habits || {};
+
+            // 获取学生信息
+            const studentName = document.getElementById('displayStudentName').textContent || '学生';
+            const studentDetails = document.getElementById('displayStudentDetails').textContent || '';
+
+            let html = '';
+
+            // 头部信息
+            html += `<div class="profile-header">
+                <div class="profile-avatar">👤</div>
+                <div class="profile-header-info">
+                    <h2>${studentName} 的学习画像</h2>
+                    <p>${studentDetails || '通过对话不断完善画像，支持随学随新'}</p>
+                </div>
+            </div>`;
+
+            html += `<div class="profile-grid">`;
+
+            // 1. 知识基础
+            const kbEntries = Object.entries(kb).filter(([k]) => !k.startsWith('_') && typeof k === 'string');
+            html += `<div class="profile-dimension-card">
+                <div class="dim-header"><span class="dim-icon">📚</span> 知识基础</div>
+                <div class="dim-content">
+                    ${kbEntries.length > 0 ? kbEntries.map(([subject, score]) => {
+                        const s = typeof score === 'number' ? score : 0;
+                        const level = s >= 70 ? 'high' : s >= 40 ? 'medium' : 'low';
+                        return `<div class="score-bar">
+                            <span style="width:80px;">${subject}</span>
+                            <div class="bar"><div class="bar-fill ${level}" style="width:${Math.min(s,100)}%"></div></div>
+                            <span style="width:36px;text-align:right;">${s}</span>
+                        </div>`;
+                    }).join('') : '<span style="color:var(--text-light);">暂无数据，多聊聊你的学习背景...</span>'}
+                </div>
+            </div>`;
+
+            // 2. 认知风格
+            const styleLabel = getCognitiveStyleLabel(cs);
+            html += `<div class="profile-dimension-card">
+                <div class="dim-header"><span class="dim-icon">🧠</span> 认知风格</div>
+                <div class="dim-content">
+                    <div style="font-size:18px;font-weight:700;color:var(--primary);margin-bottom:12px;">${styleLabel}</div>
+                    ${cs.visual_score !== undefined ? `
+                    <div class="score-bar">
+                        <span style="width:60px;">视觉型</span>
+                        <div class="bar"><div class="bar-fill ${cs.visual_score >= 60 ? 'high' : 'medium'}" style="width:${cs.visual_score}%"></div></div>
+                        <span style="width:36px;text-align:right;">${cs.visual_score}</span>
+                    </div>
+                    <div class="score-bar">
+                        <span style="width:60px;">言语型</span>
+                        <div class="bar"><div class="bar-fill ${cs.verbal_score >= 60 ? 'high' : 'medium'}" style="width:${cs.verbal_score}%"></div></div>
+                        <span style="width:36px;text-align:right;">${cs.verbal_score}</span>
+                    </div>
+                    <div class="score-bar">
+                        <span style="width:60px;">主动型</span>
+                        <div class="bar"><div class="bar-fill ${cs.active_score >= 60 ? 'high' : 'medium'}" style="width:${cs.active_score}%"></div></div>
+                        <span style="width:36px;text-align:right;">${cs.active_score}</span>
+                    </div>
+                    <div class="score-bar">
+                        <span style="width:60px;">反思型</span>
+                        <div class="bar"><div class="bar-fill ${cs.reflective_score >= 60 ? 'high' : 'medium'}" style="width:${cs.reflective_score}%"></div></div>
+                        <span style="width:36px;text-align:right;">${cs.reflective_score}</span>
+                    </div>` : '<span style="color:var(--text-light);">描述你的学习方式，我来识别你的认知风格...</span>'}
+                </div>
+            </div>`;
+
+            // 3. 学习偏好
+            html += `<div class="profile-dimension-card">
+                <div class="dim-header"><span class="dim-icon">🎯</span> 学习偏好</div>
+                <div class="dim-content">
+                    <div style="margin-bottom:8px;"><strong>偏好格式：</strong></div>
+                    ${(lp.preferred_formats || []).length > 0 ? (lp.preferred_formats || []).map(f => {
+                        const labels = { 'text': '文本', 'video': '视频', 'code': '代码', 'interactive': '互动', 'audio': '音频' };
+                        return `<span class="tag">${labels[f] || f}</span>`;
+                    }).join('') : '<span style="color:var(--text-light);">告诉我你喜欢怎么学习...</span>'}
+                    ${lp.preferred_duration ? `<div style="margin-top:12px;"><strong>单次时长：</strong><span class="tag secondary">${lp.preferred_duration}</span></div>` : ''}
+                    ${lp.preferred_difficulty ? `<div style="margin-top:8px;"><strong>偏好难度：</strong><span class="tag accent">${lp.preferred_difficulty}</span></div>` : ''}
+                </div>
+            </div>`;
+
+            // 4. 易错点偏好
+            const errorTypes = ep['常见错误类型'] || ep.common_errors || [];
+            const weakPoints = ep['易错知识点'] || ep.weak_points || [];
+            html += `<div class="profile-dimension-card">
+                <div class="dim-header"><span class="dim-icon">⚠️</span> 易错点偏好</div>
+                <div class="dim-content">
+                    <div style="margin-bottom:8px;"><strong>常见错误类型：</strong></div>
+                    ${errorTypes.length > 0 ? errorTypes.map(e => `<span class="tag" style="background:#FEE2E2;color:#991B1B;">${e}</span>`).join('') : '<span style="color:var(--text-light);">通过练习和对话，我会识别你的易错点...</span>'}
+                    ${weakPoints.length > 0 ? `<div style="margin-top:12px;"><strong>易错知识点：</strong></div>` + weakPoints.map(w => `<span class="tag" style="background:#FEF3C7;color:#92400E;">${w}</span>`).join('') : ''}
+                </div>
+            </div>`;
+
+            // 5. 学习节奏
+            html += `<div class="profile-dimension-card">
+                <div class="dim-header"><span class="dim-icon">⏱️</span> 学习节奏</div>
+                <div class="dim-content">
+                    ${pace.speed ? `<div style="margin-bottom:8px;"><strong>学习速度：</strong><span class="tag">${pace.speed === 'fast' ? '较快' : pace.speed === 'slow' ? '较慢' : '适中'}</span></div>` : ''}
+                    ${pace.avg_session_minutes ? `<div class="score-bar">
+                        <span style="width:100px;">单次时长</span>
+                        <div class="bar"><div class="bar-fill medium" style="width:${Math.min(pace.avg_session_minutes, 120) / 120 * 100}%"></div></div>
+                        <span style="width:50px;text-align:right;">${pace.avg_session_minutes}分</span>
+                    </div>` : ''}
+                    ${pace.sessions_per_week ? `<div class="score-bar">
+                        <span style="width:100px;">每周频次</span>
+                        <div class="bar"><div class="bar-fill medium" style="width:${Math.min(pace.sessions_per_week, 10) / 10 * 100}%"></div></div>
+                        <span style="width:50px;text-align:right;">${pace.sessions_per_week}次</span>
+                    </div>` : ''}
+                    ${pace.completion_rate ? `<div class="score-bar">
+                        <span style="width:100px;">完成率</span>
+                        <div class="bar"><div class="bar-fill ${pace.completion_rate >= 70 ? 'high' : 'medium'}" style="width:${pace.completion_rate}%"></div></div>
+                        <span style="width:50px;text-align:right;">${pace.completion_rate}%</span>
+                    </div>` : ''}
+                    ${!pace.speed && !pace.avg_session_minutes ? '<span style="color:var(--text-light);">聊聊你的学习时间安排...</span>' : ''}
+                </div>
+            </div>`;
+
+            // 6. 目标导向
+            const shortTerm = goals.short_term || [];
+            const longTerm = goals.long_term || [];
+            html += `<div class="profile-dimension-card">
+                <div class="dim-header"><span class="dim-icon">🎯</span> 目标导向</div>
+                <div class="dim-content">
+                    ${shortTerm.length > 0 ? `<div style="margin-bottom:8px;"><strong>短期目标：</strong></div>` + shortTerm.map(g => `<span class="tag secondary">${g}</span>`).join('') : ''}
+                    ${longTerm.length > 0 ? `<div style="margin-top:12px;margin-bottom:8px;"><strong>长期目标：</strong></div>` + longTerm.map(g => `<span class="tag">${g}</span>`).join('') : ''}
+                    ${goals.priority ? `<div style="margin-top:12px;"><strong>优先级：</strong><span class="tag accent">${goals.priority}</span></div>` : ''}
+                    ${shortTerm.length === 0 && longTerm.length === 0 ? '<span style="color:var(--text-light);">分享你的学习目标，我来帮你规划...</span>' : ''}
+                </div>
+            </div>`;
+
+            // 7. 学科兴趣
+            const primary = interests.primary || [];
+            const secondary = interests.secondary || [];
+            const interestLevel = interests.interest_level || 0;
+            html += `<div class="profile-dimension-card">
+                <div class="dim-header"><span class="dim-icon">⭐</span> 学科兴趣</div>
+                <div class="dim-content">
+                    ${primary.length > 0 ? `<div style="margin-bottom:8px;"><strong>主要兴趣：</strong></div>` + primary.map(i => `<span class="tag" style="background:#ECFDF5;color:#065F46;">${i}</span>`).join('') : ''}
+                    ${secondary.length > 0 ? `<div style="margin-top:12px;margin-bottom:8px;"><strong>次要兴趣：</strong></div>` + secondary.map(i => `<span class="tag secondary">${i}</span>`).join('') : ''}
+                    ${interestLevel ? `<div class="score-bar" style="margin-top:12px;">
+                        <span style="width:80px;">兴趣度</span>
+                        <div class="bar"><div class="bar-fill high" style="width:${interestLevel}%"></div></div>
+                        <span style="width:36px;text-align:right;">${interestLevel}</span>
+                    </div>` : ''}
+                    ${primary.length === 0 && secondary.length === 0 ? '<span style="color:var(--text-light);">告诉我你对哪些学科感兴趣...</span>' : ''}
+                </div>
+            </div>`;
+
+            // 8. 学习习惯
+            html += `<div class="profile-dimension-card">
+                <div class="dim-header"><span class="dim-icon">📅</span> 学习习惯</div>
+                <div class="dim-content">
+                    ${habits.best_time ? `<div style="margin-bottom:8px;"><strong>最佳学习时间：</strong><span class="tag">${habits.best_time}</span></div>` : ''}
+                    ${habits.note_taking ? `<div style="margin-bottom:8px;"><strong>笔记方式：</strong><span class="tag secondary">${habits.note_taking}</span></div>` : ''}
+                    ${habits.review_frequency ? `<div style="margin-bottom:8px;"><strong>复习频率：</strong><span class="tag accent">${habits.review_frequency}</span></div>` : ''}
+                    ${habits.group_study !== undefined ? `<div style="margin-bottom:8px;"><strong>小组学习：</strong><span class="tag">${habits.group_study ? '喜欢' : '偏好独立'}</span></div>` : ''}
+                    ${!habits.best_time && !habits.note_taking ? '<span style="color:var(--text-light);">聊聊你的学习习惯...</span>' : ''}
+                </div>
+            </div>`;
+
+            // 画像摘要（跨列）
+            if (profile.profile_summary && profile.profile_summary !== '新学生，画像待构建') {
+                html += `<div class="profile-summary-box">
+                    <h3>📝 画像综合描述</h3>
+                    <p>${profile.profile_summary}</p>
+                </div>`;
+            }
+
+            // 更新时间
+            html += `<div class="profile-update-time">
+                💡 画像通过自然语言对话自动构建，每次对话后自动更新 · 当前版本: v${profile.profile_version || 1}
+            </div>`;
+
+            html += `</div>`; // end profile-grid
+
+            container.innerHTML = html;
         }
 
         // 加载系统统计
@@ -1218,15 +1701,38 @@
 
             ws.onopen = async () => {
                 console.log('WebSocket 已连接');
+                // 加载活跃对话的历史消息
                 try {
-                    const resp = await fetch(`/api/students/${studentId}/conversations`);
-                    const data = await resp.json();
-                    const messages = data.messages || [];
-                    messages.forEach(msg => {
-                        if (msg.role === 'user' || msg.role === 'assistant') {
-                            addChatMessage(msg.role, msg.content);
+                    // 先确保对话列表已加载，获取当前活跃对话ID
+                    await loadConversationList();
+
+                    if (currentConversationId) {
+                        // 如果有当前对话，加载该对话的完整消息
+                        const resp = await fetch(`/api/students/${studentId}/conversation/${currentConversationId}`);
+                        const data = await resp.json();
+                        const messages = data.messages || [];
+                        if (messages.length > 0) {
+                            document.getElementById('chatMessages').innerHTML = '';
+                            messages.forEach(msg => {
+                                if (msg.role === 'user' || msg.role === 'assistant') {
+                                    addChatMessage(msg.role, msg.content);
+                                }
+                            });
                         }
-                    });
+                    } else {
+                        // 没有活跃对话时，获取最近一个对话的消息
+                        const resp = await fetch(`/api/students/${studentId}/conversations`);
+                        const data = await resp.json();
+                        const messages = data.messages || [];
+                        if (messages.length > 0) {
+                            document.getElementById('chatMessages').innerHTML = '';
+                            messages.forEach(msg => {
+                                if (msg.role === 'user' || msg.role === 'assistant') {
+                                    addChatMessage(msg.role, msg.content);
+                                }
+                            });
+                        }
+                    }
                 } catch (e) {
                     console.log('历史加载失败', e);
                 }
@@ -1238,7 +1744,25 @@
                     addChatMessage('assistant', '错误: ' + data.error);
                 } else {
                     addChatMessage('assistant', data.response);
-                    if (data.profile_updated) loadProfile();
+                    
+                    // 更新当前对话 ID 和标题
+                    if (data.conversation_id) {
+                        currentConversationId = data.conversation_id;
+                    }
+                    
+                    if (data.profile_updated) {
+                        loadProfile().then(() => {
+                            const profileTab = document.querySelector('.content-tab[data-tab="profile"]');
+                            if (profileTab && profileTab.classList.contains('active')) {
+                                renderProfilePage(currentProfile);
+                            }
+                        });
+                    }
+                    
+                    // 对话标题更新后刷新列表
+                    if (data.conversation_title) {
+                        loadConversationList();
+                    }
                 }
                 hideLoading();
             };
@@ -1313,8 +1837,23 @@
             }
 
             // 通过 WebSocket 发送消息
-            const wsType = chatType === 'tutor' ? 'tutor' : 'profile';
-            ws.send(JSON.stringify({ message, type: wsType }));
+            const wsType = chatType === 'tutor' ? 'tutor' : chatType === 'profile' ? 'profile' : 'general';
+
+            // 如果没有当前对话ID，先创建一个新对话
+            if (!currentConversationId) {
+                try {
+                    const resp = await fetch(`/api/students/${currentStudentId}/conversation-new`, { method: 'POST' });
+                    const data = await resp.json();
+                    if (data.conversation) {
+                        currentConversationId = data.conversation.id;
+                        await loadConversationList();
+                    }
+                } catch (e) {
+                    console.log('创建新对话失败:', e);
+                }
+            }
+
+            ws.send(JSON.stringify({ message, type: wsType, conversation_id: currentConversationId }));
         }
 
         // 添加聊天消息
@@ -1373,14 +1912,24 @@
             // 恢复代码块
             processed = processed.replace(/%%CODEBLOCK_(\d+)%%/g, (_, i) => codeBlocks[i]);
             processed = processed.replace(/%%INLINECODE_(\d+)%%/g, (_, i) => inlineCodes[i]);
+            // 换行：先把 \n 统一转为 <br>，后续处理基于 <br>
+            processed = processed.replace(/\n/g, '<br>');
             // 应用 Markdown 格式化（此时已安全转义）
-            return processed
+            let result = processed
                 .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                .replace(/\n/g, '<br>')
-                .replace(/### (.+)/g, '<h3>$1</h3>')
-                .replace(/## (.+)/g, '<h2>$1</h2>')
-                .replace(/# (.+)/g, '<h1>$1</h1>');
+                .replace(/\*(.+?)\*/g, '<em>$1</em>');
+            // 处理分隔线 ---（在标题之前，避免和 ## 冲突）
+            result = result.replace(/(^|<br>)---+(?=<br>|$)/g, '$1<hr style="border:none;border-top:1px solid var(--border);margin:12px 0;">');
+            // 标题替换：匹配行首或<br>后的#，避免替换正文中的#
+            result = result.replace(/(^|<br>)###\s+(.+?)(?=<br>|$)/g, '$1<h3>$2</h3>');
+            result = result.replace(/(^|<br>)##\s+(.+?)(?=<br>|$)/g, '$1<h2>$2</h2>');
+            result = result.replace(/(^|<br>)#\s+(.+?)(?=<br>|$)/g, '$1<h1>$2</h1>');
+            // 处理引用块 >
+            result = result.replace(/(^|<br>)&gt;\s+(.+?)(?=<br>|$)/g, '$1<blockquote style="margin:4px 0;padding:8px 12px;border-left:3px solid var(--primary);background:#F8FAFC;color:var(--text-light);">$2</blockquote>');
+            // 处理列表（在行首或<br>后的 - 或 *，且不是 ** 加粗）
+            result = result.replace(/(^|<br>)(\s*)-\s+(.+?)(?=<br>|$)/g, '$1$2• $3');
+            result = result.replace(/(^|<br>)(\s*)\*(?!\*)\s+(.+?)(?=<br>|$)/g, '$1$2• $3');
+            return result;
         }
 
         // 生成资源
@@ -1542,8 +2091,8 @@
                     }
                 }
 
+                document.getElementById('modalTitle').innerHTML = `${getTypeEmoji(resource.type)} ${resource.title}`;
                 content.innerHTML = `
-                    <h2 style="font-size:18px;margin-bottom:8px;">${getTypeEmoji(resource.type)} ${resource.title}</h2>
                     <div style="margin-bottom:12px;color:var(--text-light);font-size:13px;">
                         ${resource.subject || ''} · ${resource.topic || ''} · ${getTypeName(resource.type)}
                     </div>
@@ -1709,56 +2258,95 @@
                     <span style="color:${level===0?'var(--primary)':'var(--text)'};font-weight:${level<2?'600':'400'};">
                         ${level===0?'📌 ':level===1?'🔹 ':'• '}${node.name || ''}
                     </span>`;
-                if (node.description) html += ` <small style="color:var(--text-light);">- ${node.description}</small>`;
+                const desc = node.description || '';
+                if (desc.trim() && desc.trim() !== '...') {
+                    html += ` <small style="color:var(--text-light);">- ${desc}</small>`;
+                }
                 if (node.importance) html += ` <span class="badge">${node.importance}</span>`;
-                if (node.key_points) {
+                if (node.key_points && node.key_points.length > 0) {
                     html += `<div style="margin-left:16px;font-size:12px;color:var(--text-light);">要点: ${node.key_points.join(', ')}</div>`;
                 }
-                if (node.children) {
+                if (node.children && node.children.length > 0) {
                     node.children.forEach(child => { html += renderNode(child, level + 1); });
                 }
                 html += '</div>';
                 return html;
             }
-            
-            let html = `<h3>${meta.title || '思维导图'}</h3>`;
+
+            let html = '';
             if (meta.root) {
                 html += renderNode(meta.root);
+            } else {
+                html += `<div style="background:#FEE2E2;padding:16px;border-radius:8px;color:#991B1B;">
+                    <strong>⚠️ 思维导图数据为空</strong><br>
+                    该思维导图暂无内容，可能是生成过程中出现错误。请尝试重新生成学习资源。
+                </div>`;
             }
             return html;
         }
 
         function renderReadingContent(meta) {
-            let html = `<h3>${meta.title || '拓展阅读'}</h3>`;
+            let html = '';
             const materials = meta.materials || [];
+            if (materials.length === 0) {
+                html += `<div style="background:#FEE2E2;padding:16px;border-radius:8px;color:#991B1B;">
+                    <strong>⚠️ 拓展阅读内容为空</strong><br>
+                    该拓展阅读暂无内容，可能是生成过程中出现错误。请尝试重新生成学习资源。
+                </div>`;
+            }
             materials.forEach(m => {
+                const summary = m.summary || '';
+                const reason = m.recommendation_reason || '';
                 html += `<div style="background:#F8FAFC;padding:12px;margin:8px 0;border-radius:8px;">
                     <strong>${m.id || ''}. ${m.title || ''}</strong>
                     <span class="badge">${m.type || ''}</span>
-                    <span class="badge">${m.difficulty_level || ''}</span>
-                    <p style="margin:8px 0;">${m.summary || ''}</p>
-                    <div style="font-size:12px;color:var(--text-light);">
-                        来源: ${m.source || ''} | 阅读时间: ${m.estimated_reading_time || '未知'}分钟<br>
-                        推荐理由: ${m.recommendation_reason || ''}
-                    </div>
-                    ${m.key_takeaways ? `<div style="margin-top:8px;"><strong>要点：</strong>${m.key_takeaways.map(t => '• '+t).join('<br>')}</div>` : ''}
-                </div>`;
+                    <span class="badge">${m.difficulty_level || ''}</span>`;
+                if (summary.trim() && summary.trim() !== '...') {
+                    html += `<p style="margin:8px 0;">${summary}</p>`;
+                } else {
+                    html += `<p style="margin:8px 0;padding:8px;background:#FEF3C7;border-radius:4px;color:#92400E;font-size:13px;">⏳ 内容摘要待生成</p>`;
+                }
+                html += `<div style="font-size:12px;color:var(--text-light);">
+                    来源: ${m.source || ''} | 阅读时间: ${m.estimated_reading_time || '未知'}分钟<br>`;
+                if (reason.trim() && reason.trim() !== '...') {
+                    html += `推荐理由: ${reason}`;
+                } else {
+                    html += `推荐理由: 待补充`;
+                }
+                html += `</div>`;
+                if (m.key_takeaways && m.key_takeaways.length > 0) {
+                    html += `<div style="margin-top:8px;"><strong>要点：</strong>${m.key_takeaways.map(t => '• '+t).join('<br>')}</div>`;
+                }
+                html += `</div>`;
             });
             return html;
         }
 
         function renderPPTSlidesContent(meta) {
-            let html = `<h3>📊 ${meta.title || '课件讲义'}</h3>`;
-            html += `<p>难度: ${meta.difficulty || '中等'} | 预估时长: ${meta.estimated_duration || ''}</p>`;
+            let html = `<p>难度: ${meta.difficulty || '中等'} | 预估时长: ${meta.estimated_duration || ''}</p>`;
             if (meta.summary) {
                 html += `<div style="background:#F8FAFC;padding:12px;border-radius:8px;margin:8px 0;"><strong>课程总结：</strong>${meta.summary}</div>`;
             }
 
             const chapters = meta.chapters || [];
+            if (chapters.length === 0) {
+                html += `<div style="background:#FEE2E2;padding:16px;border-radius:8px;margin:12px 0;color:#991B1B;">
+                    <strong>⚠️ 课件内容为空</strong><br>
+                    该课件讲义暂无内容，可能是生成过程中出现错误。请尝试重新生成学习资源。
+                </div>`;
+            }
             chapters.forEach(ch => {
                 html += `<div style="background:#FFFFFF;padding:16px;margin:12px 0;border-radius:8px;border:1px solid var(--border);">`;
                 html += `<h4 style="color:var(--primary);">第${ch.chapter_id}章: ${ch.title || ''}</h4>`;
-                html += `<div style="margin:8px 0;line-height:1.8;">${formatContent(ch.content || '')}</div>`;
+                const chContent = ch.content || '';
+                if (chContent.trim() && chContent.trim() !== '...' && chContent.trim() !== '待补充') {
+                    html += `<div style="margin:8px 0;line-height:1.8;">${formatContent(chContent)}</div>`;
+                } else {
+                    html += `<div style="margin:8px 0;padding:12px;background:#FEF3C7;border-radius:4px;color:#92400E;font-size:13px;">
+                        <strong>⏳ 本章内容待生成</strong><br>
+                        该章节暂无详细内容，请稍后刷新或重新生成资源。
+                    </div>`;
+                }
 
                 if (ch.key_points && ch.key_points.length > 0) {
                     html += `<div style="background:#FEF3C7;padding:8px;border-radius:4px;margin:8px 0;"><strong>🔑 要点：</strong>${ch.key_points.join('、')}</div>`;
@@ -1898,6 +2486,208 @@
             
             // 更新学习进度
             loadLearningProgress();
+        }
+
+        // ==================== 对话历史管理 ====================
+
+        // 加载对话列表
+        async function loadConversationList() {
+            if (!currentStudentId) return;
+            try {
+                const resp = await fetch(`/api/students/${currentStudentId}/conversation-list`);
+                const data = await resp.json();
+                const conversations = data.conversations || [];
+                renderConversationList(conversations);
+
+                // 如果当前没有活跃对话，但有历史对话，自动加载最新的
+                if (!currentConversationId && conversations.length > 0) {
+                    const latest = conversations[0];
+                    currentConversationId = latest.id;
+                }
+            } catch (err) {
+                console.log('加载对话列表失败:', err);
+            }
+        }
+
+        // 渲染对话列表
+        function renderConversationList(conversations) {
+            const container = document.getElementById('conversationList');
+            if (!conversations || conversations.length === 0) {
+                container.innerHTML = '<div class="conv-empty">暂无对话记录</div>';
+                return;
+            }
+
+            let html = '';
+            conversations.forEach(conv => {
+                const isActive = conv.is_active || conv.id === currentConversationId;
+                const dateStr = conv.updated_at ? new Date(conv.updated_at).toLocaleDateString('zh-CN') : '';
+                const typeIcon = conv.conversation_type === 'profile' ? '🧠' : 
+                                conv.conversation_type === 'tutor' ? '📝' : '💬';
+                
+                html += `
+                    <div class="conv-item ${isActive ? 'active' : ''}" 
+                         onclick="switchConversation(${conv.id})"
+                         data-conv-id="${conv.id}">
+                        <span class="conv-icon">${typeIcon}</span>
+                        <div class="conv-info">
+                            <div class="conv-title">${escapeHtml(conv.title || '新对话')}</div>
+                            <div class="conv-meta">${conv.message_count || 0} 条消息 · ${dateStr}</div>
+                        </div>
+                        <button class="conv-delete" onclick="event.stopPropagation();deleteConversation(${conv.id})" title="删除对话">🗑</button>
+                    </div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        // 切换对话
+        async function switchConversation(convId) {
+            if (!currentStudentId) return;
+            if (convId === currentConversationId) return;
+
+            showLoading('加载对话...');
+            try {
+                const resp = await fetch(`/api/students/${currentStudentId}/conversation/${convId}`);
+                if (!resp.ok) {
+                    alert('对话加载失败');
+                    return;
+                }
+                const data = await resp.json();
+                currentConversationId = data.id;
+
+                // 清空并重新渲染聊天消息
+                const chatContainer = document.getElementById('chatMessages');
+                chatContainer.innerHTML = '';
+                
+                const messages = data.messages || [];
+                if (messages.length === 0) {
+                    chatContainer.innerHTML = `
+                        <div class="chat-message assistant">
+                            <div class="chat-avatar">🤖</div>
+                            <div class="chat-bubble">
+                                开始新的对话吧！你可以：<br>
+                                1️⃣ 和我聊聊你的学习情况<br>
+                                2️⃣ 提问学习问题<br>
+                                3️⃣ 输入「生成 [科目] [主题] 的学习资料」
+                            </div>
+                        </div>`;
+                } else {
+                    messages.forEach(msg => {
+                        if (msg.role === 'user' || msg.role === 'assistant') {
+                            addChatMessage(msg.role, msg.content);
+                        }
+                    });
+                }
+
+                // 刷新对话列表高亮
+                await loadConversationList();
+                
+                // 切换到对话标签
+                switchTab('chat');
+            } catch (err) {
+                alert('加载对话失败: ' + err.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 创建新对话
+        async function createNewConversation() {
+            if (!currentStudentId) {
+                alert('请先登录');
+                return;
+            }
+
+            showLoading('创建新对话...');
+            try {
+                const resp = await fetch(`/api/students/${currentStudentId}/conversation-new`, {
+                    method: 'POST'
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    alert('创建失败');
+                    return;
+                }
+                
+                currentConversationId = data.conversation.id;
+                
+                // 清空聊天区
+                const chatContainer = document.getElementById('chatMessages');
+                chatContainer.innerHTML = `
+                    <div class="chat-message assistant">
+                        <div class="chat-avatar">🤖</div>
+                        <div class="chat-bubble">
+                            开始新的对话吧！你可以：<br>
+                            1️⃣ <strong>和我聊聊你的学习情况</strong> — 我会自动构建你的学习画像<br>
+                            2️⃣ <strong>提问学习问题</strong> — 获取多模态辅导解答<br>
+                            3️⃣ <strong>告诉我你想学什么</strong> — 例如「生成 数据结构 二叉树 的学习资料」
+                        </div>
+                    </div>`;
+                
+                // 刷新对话列表
+                await loadConversationList();
+                
+                // 切换到对话标签
+                switchTab('chat');
+            } catch (err) {
+                alert('创建失败: ' + err.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 删除对话
+        async function deleteConversation(convId) {
+            if (!currentStudentId) return;
+            if (!confirm('确定要删除这个对话吗？此操作不可撤销。')) return;
+
+            try {
+                const resp = await fetch(`/api/students/${currentStudentId}/conversation/${convId}`, {
+                    method: 'DELETE'
+                });
+                if (!resp.ok) {
+                    alert('删除失败');
+                    return;
+                }
+                
+                // 如果删除的是当前对话，清空聊天区
+                if (convId === currentConversationId) {
+                    currentConversationId = null;
+                    document.getElementById('chatMessages').innerHTML = `
+                        <div class="chat-message assistant">
+                            <div class="chat-avatar">🤖</div>
+                            <div class="chat-bubble">
+                                <strong>欢迎使用高等教育个性化学习资源智能体系统！</strong><br><br>
+                                我是你的智能学习助手，你可以：<br>
+                                1️⃣ <strong>和我聊聊你的学习情况</strong> — 我会自动构建你的学习画像<br>
+                                2️⃣ <strong>提问学习问题</strong> — 获取多模态辅导解答<br>
+                                3️⃣ <strong>告诉我你想学什么</strong> — 例如「生成 数据结构 二叉树 的学习资料」
+                            </div>
+                        </div>`;
+                }
+                
+                // 刷新对话列表
+                await loadConversationList();
+            } catch (err) {
+                alert('删除失败: ' + err.message);
+            }
+        }
+
+        // 切换对话侧边栏显示/隐藏
+        function toggleConversationSidebar() {
+            const sidebar = document.getElementById('conversationSidebar');
+            const toggleBtn = sidebar.querySelector('.conv-toggle-btn');
+            const expandBtn = document.getElementById('convExpandBtn');
+            conversationSidebarVisible = !conversationSidebarVisible;
+            
+            if (conversationSidebarVisible) {
+                sidebar.classList.remove('collapsed');
+                toggleBtn.textContent = '◀';
+                expandBtn.classList.remove('visible');
+            } else {
+                sidebar.classList.add('collapsed');
+                toggleBtn.textContent = '▶';
+                expandBtn.classList.add('visible');
+            }
         }
 
         // 快速生成资源

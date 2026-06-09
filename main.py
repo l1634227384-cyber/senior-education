@@ -272,6 +272,162 @@ async def get_conversations(student_id: str, db: AsyncSession = Depends(get_db))
     messages = conv.messages if conv and conv.messages else []
     return {"messages": messages}
 
+
+# ==================== 对话会话管理 API ====================
+
+@app.get("/api/students/{student_id}/conversation-list")
+async def list_conversations(student_id: str, db: AsyncSession = Depends(get_db)):
+    """获取学生的所有对话会话列表（用于侧边栏）"""
+    student = await _get_student(db, student_id)
+    
+    result = await db.execute(
+        select(Conversation).where(
+            Conversation.student_id == student.id
+        ).order_by(Conversation.updated_at.desc())
+    )
+    conversations = result.scalars().all()
+    
+    conv_list = []
+    for conv in conversations:
+        # 取第一条用户消息作为预览
+        preview = ""
+        if conv.messages:
+            for m in conv.messages:
+                if m.get("role") == "user":
+                    preview = m.get("content", "")[:50]
+                    break
+        conv_list.append({
+            "id": conv.id,
+            "session_id": conv.session_id,
+            "title": conv.title or "新对话",
+            "conversation_type": conv.conversation_type,
+            "preview": preview,
+            "is_active": conv.is_active or False,
+            "message_count": len(conv.messages) if conv.messages else 0,
+            "created_at": conv.created_at.isoformat() if conv.created_at else None,
+            "updated_at": conv.updated_at.isoformat() if conv.updated_at else None
+        })
+    
+    return {"conversations": conv_list, "total": len(conv_list)}
+
+
+@app.post("/api/students/{student_id}/conversation-new")
+async def create_conversation(student_id: str, db: AsyncSession = Depends(get_db)):
+    """创建新对话会话"""
+    student = await _get_student(db, student_id)
+    
+    # 将所有旧对话设为非活跃
+    old_result = await db.execute(
+        select(Conversation).where(
+            Conversation.student_id == student.id,
+            Conversation.is_active == True
+        )
+    )
+    for old_conv in old_result.scalars().all():
+        old_conv.is_active = False
+    
+    # 创建新对话
+    new_conv = Conversation(
+        student_id=student.id,
+        session_id=str(uuid.uuid4()),
+        conversation_type="general",
+        title="新对话",
+        messages=[],
+        is_active=True
+    )
+    db.add(new_conv)
+    await db.commit()
+    await db.refresh(new_conv)
+    
+    return {
+        "status": "success",
+        "conversation": {
+            "id": new_conv.id,
+            "session_id": new_conv.session_id,
+            "title": new_conv.title,
+            "conversation_type": new_conv.conversation_type,
+            "is_active": True,
+            "message_count": 0,
+            "created_at": new_conv.created_at.isoformat() if new_conv.created_at else None,
+            "updated_at": new_conv.updated_at.isoformat() if new_conv.updated_at else None
+        }
+    }
+
+
+@app.get("/api/students/{student_id}/conversation/{conv_id}")
+async def load_conversation(student_id: str, conv_id: int, db: AsyncSession = Depends(get_db)):
+    """加载指定对话会话的完整消息"""
+    student = await _get_student(db, student_id)
+    
+    result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == conv_id,
+            Conversation.student_id == student.id
+        )
+    )
+    conv = result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    
+    # 将该对话设为活跃，其他设为非活跃
+    old_result = await db.execute(
+        select(Conversation).where(
+            Conversation.student_id == student.id,
+            Conversation.is_active == True,
+            Conversation.id != conv_id
+        )
+    )
+    for old_conv in old_result.scalars().all():
+        old_conv.is_active = False
+    
+    conv.is_active = True
+    await db.commit()
+    
+    return {
+        "id": conv.id,
+        "session_id": conv.session_id,
+        "title": conv.title or "新对话",
+        "conversation_type": conv.conversation_type,
+        "messages": conv.messages or [],
+        "is_active": True,
+        "created_at": conv.created_at.isoformat() if conv.created_at else None,
+        "updated_at": conv.updated_at.isoformat() if conv.updated_at else None
+    }
+
+
+@app.delete("/api/students/{student_id}/conversation/{conv_id}")
+async def delete_conversation(student_id: str, conv_id: int, db: AsyncSession = Depends(get_db)):
+    """删除指定对话会话"""
+    student = await _get_student(db, student_id)
+    
+    result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == conv_id,
+            Conversation.student_id == student.id
+        )
+    )
+    conv = result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    
+    was_active = conv.is_active
+    await db.delete(conv)
+    
+    # 如果删除的是活跃对话，将最近的一个设为活跃
+    if was_active:
+        recent_result = await db.execute(
+            select(Conversation).where(
+                Conversation.student_id == student.id
+            ).order_by(Conversation.updated_at.desc()).limit(1)
+        )
+        recent = recent_result.scalar_one_or_none()
+        if recent:
+            recent.is_active = True
+    
+    await db.commit()
+    
+    return {"status": "success", "message": "对话已删除"}
+
 @app.get("/api/students/{student_id}/profile")
 async def get_student_profile(student_id: str, db: AsyncSession = Depends(get_db)):
     """获取学生画像"""
@@ -362,11 +518,22 @@ async def chat_profile_building(request: ChatRequest, db: AsyncSession = Depends
     if conv:
         conv.messages = messages
         conv.updated_at = datetime.now()
+        # 自动更新标题
+        user_msgs = [m for m in messages if m.get("role") == "user"]
+        if user_msgs and (not conv.title or conv.title == "新对话"):
+            conv.title = user_msgs[0].get("content", "")[:30] + ("..." if len(user_msgs[0].get("content", "")) > 30 else "")
     else:
+        # 自动生成标题
+        first_user_msg = next((m for m in messages if m.get("role") == "user"), None)
+        title = first_user_msg.get("content", "")[:30] if first_user_msg else "新对话"
+        if title != "新对话":
+            title = title + ("..." if len(first_user_msg.get("content", "")) > 30 else "")
+        
         conv = Conversation(
             student_id=student.id,
             session_id=str(uuid.uuid4()),
             conversation_type="profile_building",
+            title=title,
             messages=messages
         )
         db.add(conv)
@@ -401,33 +568,44 @@ async def generate_resources(request: ResourceGenerateRequest, db: AsyncSession 
     resources = result.get("resources", [])
     learning_path_data = result.get("learning_path")
 
+    print(f"[API] 收到 {len(resources)} 个待保存资源")
+    for r in resources:
+        print(f"  - 类型: {r.get('type', 'unknown')}, 标题: {r.get('title', '无标题')[:40]}")
+
     # 保存资源到数据库
     saved_resources = []
     for resource in resources:
-        db_resource = LearningResource(
-            resource_type=resource.get("type", ""),
-            title=resource.get("title", ""),
-            subject=resource.get("subject", ""),
-            topic=resource.get("topic", ""),
-            difficulty=resource.get("difficulty", "intermediate"),
-            content=resource.get("content", ""),
-            generated_by=resource.get("generated_by", ""),
-            target_student_id=student.id,
-            extra_data=resource.get("metadata", {}),
-            generation_params={"subject": request.subject, "topic": request.topic}
-    )
-    db.add(db_resource)
-    await db.flush()  # 获取真实数据库 ID
-    saved_resources.append({
-        "id": db_resource.id,
-        "type": db_resource.resource_type,
-        "title": db_resource.title,
-        "subject": db_resource.subject,
-        "topic": db_resource.topic,
-        "difficulty": db_resource.difficulty,
-        "content": db_resource.content,
-        "generated_by": db_resource.generated_by
-    })
+        try:
+            db_resource = LearningResource(
+                resource_type=resource.get("type", ""),
+                title=resource.get("title", ""),
+                subject=resource.get("subject", ""),
+                topic=resource.get("topic", ""),
+                difficulty=resource.get("difficulty", "intermediate"),
+                content=resource.get("content", ""),
+                generated_by=resource.get("generated_by", ""),
+                target_student_id=student.id,
+                extra_data=resource.get("metadata", {}),
+                generation_params={"subject": request.subject, "topic": request.topic}
+            )
+            db.add(db_resource)
+            await db.flush()  # 获取真实数据库 ID
+            saved_resources.append({
+                "id": db_resource.id,
+                "type": db_resource.resource_type,
+                "title": db_resource.title,
+                "subject": db_resource.subject,
+                "topic": db_resource.topic,
+                "difficulty": db_resource.difficulty,
+                "content": db_resource.content,
+                "generated_by": db_resource.generated_by,
+                "created_at": db_resource.created_at.isoformat() if db_resource.created_at else None
+            })
+            print(f"[API] 资源已保存: {db_resource.resource_type} - {db_resource.title[:40]}")
+        except Exception as e:
+            print(f"[API错误] 保存资源失败: {e}")
+            import traceback
+            traceback.print_exc()
 
     # 保存学习路径
     if learning_path_data:
@@ -474,7 +652,7 @@ async def get_resource(resource_id: str, db: AsyncSession = Depends(get_db)):
         "topic": resource.topic,
         "difficulty": resource.difficulty,
         "content": resource.content,
-        "format": resource.extra_data and "json" if resource.extra_data else "markdown",
+        "format": "json" if (resource.extra_data and resource.resource_type not in ("ppt_slides", "lecture_doc")) else "markdown",
         "metadata": resource.extra_data,
         "generated_by": resource.generated_by,
         "view_count": resource.view_count,
@@ -850,11 +1028,22 @@ async def ask_tutor(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     if conv:
         conv.messages = messages
         conv.updated_at = datetime.now()
+        # 自动更新标题
+        user_msgs = [m for m in messages if m.get("role") == "user"]
+        if user_msgs and (not conv.title or conv.title == "新对话"):
+            conv.title = user_msgs[0].get("content", "")[:30] + ("..." if len(user_msgs[0].get("content", "")) > 30 else "")
     else:
+        # 自动生成标题
+        first_user_msg = next((m for m in messages if m.get("role") == "user"), None)
+        title = first_user_msg.get("content", "")[:30] if first_user_msg else "新对话"
+        if title != "新对话":
+            title = title + ("..." if len(first_user_msg.get("content", "")) > 30 else "")
+        
         conv = Conversation(
             student_id=student.id,
             session_id=str(uuid.uuid4()),
             conversation_type="tutoring",
+            title=title,
             messages=messages
         )
         db.add(conv)
@@ -977,13 +1166,38 @@ async def websocket_chat(websocket: WebSocket, student_id: str):
         profile = await _get_or_create_profile(db, student.id)
         profile_dict = profile_to_dict(profile)
 
-        # 获取对话历史
+        # 获取当前活跃对话，如果没有则创建一个
         conv_result = await db.execute(
             select(Conversation).where(
-                Conversation.student_id == student.id
-            ).order_by(Conversation.created_at.desc()).limit(1)
+                Conversation.student_id == student.id,
+                Conversation.is_active == True
+            ).order_by(Conversation.updated_at.desc()).limit(1)
         )
         conv = conv_result.scalar_one_or_none()
+        
+        if not conv:
+            # 尝试获取最近一次对话
+            conv_result = await db.execute(
+                select(Conversation).where(
+                    Conversation.student_id == student.id
+                ).order_by(Conversation.updated_at.desc()).limit(1)
+            )
+            conv = conv_result.scalar_one_or_none()
+        
+        if not conv:
+            # 创建新对话
+            conv = Conversation(
+                student_id=student.id,
+                session_id=str(uuid.uuid4()),
+                conversation_type="general",
+                title="新对话",
+                messages=[],
+                is_active=True
+            )
+            db.add(conv)
+            await db.commit()
+            await db.refresh(conv)
+        
         messages = conv.messages if conv and conv.messages else []
 
         try:
@@ -992,10 +1206,42 @@ async def websocket_chat(websocket: WebSocket, student_id: str):
                 data = await websocket.receive_json()
                 message = data.get("message", "")
                 chat_type = data.get("type", "general")
+                req_conversation_id = data.get("conversation_id")
 
                 # ================= 加上日志打印 =================
                 print(f"\n[WS 收到消息] 学生: {student_id}, 类型: {chat_type}, 内容: {message}")
                 # ===============================================
+
+                # 如果客户端指定了不同的对话ID，切换对话
+                if req_conversation_id and req_conversation_id != (conv.id if conv else None):
+                    new_conv_result = await db.execute(
+                        select(Conversation).where(
+                            Conversation.id == req_conversation_id,
+                            Conversation.student_id == student.id
+                        )
+                    )
+                    new_conv = new_conv_result.scalar_one_or_none()
+                    if new_conv:
+                        # 将旧对话设为非活跃
+                        if conv:
+                            conv.is_active = False
+                        conv = new_conv
+                        conv.is_active = True
+                        await db.commit()
+                        await db.refresh(conv)
+                        messages = conv.messages if conv.messages else []
+
+                # 自动更新对话标题（使用第一条用户消息的前30字）
+                if conv and (not conv.title or conv.title == "新对话") and messages:
+                    user_msgs = [m for m in messages if m.get("role") == "user"]
+                    if not user_msgs:  # 这是第一条用户消息
+                        conv.title = message[:30] + ("..." if len(message) > 30 else "")
+                        conv.conversation_type = chat_type
+                
+                # 刷新 conv 的 messages 引用
+                if conv:
+                    await db.refresh(conv)
+                    messages = conv.messages if conv.messages else []
 
                 # 根据类型路由
                 if chat_type == "profile":
@@ -1004,9 +1250,8 @@ async def websocket_chat(websocket: WebSocket, student_id: str):
                         "timestamp": datetime.now().isoformat()
                     })
 
-                    print("[WS 智能体] 正在调用 multi_agent_system.run (画像构建)...") # 👈 加上这行
+                    print("[WS 智能体] 正在调用 multi_agent_system.run (画像构建)...")
                     try:
-                        # 限制 multi_agent_system.run 最多只能执行 30 秒
                         result = await asyncio.wait_for(
                             multi_agent_system.run(
                                 task_type="profile_building",
@@ -1015,15 +1260,16 @@ async def websocket_chat(websocket: WebSocket, student_id: str):
                                 messages=messages[-10:],
                                 student_id=student_id
                             ), 
-                        timeout=30.0  # 超时时间设置为 30 秒
+                        timeout=30.0
                         )
                         print(f"[WS 智能体] 调用结束 (画像构建)...")
                     except asyncio.TimeoutError:
                         print("[WS 错误] ❌ 智能体系统调用超时(30秒内未响应),已自动熔断!")
                         response = "抱歉，智能体助手响应超时，请稍后再试或检查网络。"
                         result = {}
-                    print(f"[WS 智能体] 调用结束 (画像构建), 返回结果大小: {len(str(result))} 字符") # 👈 加上这行
+                    print(f"[WS 智能体] 调用结束 (画像构建), 返回结果大小: {len(str(result))} 字符")
 
+                    profile_updated = False
                     if result.get("student_profile"):
                         new_data = result["student_profile"]
                         profile.knowledge_base = new_data.get("knowledge_base", profile.knowledge_base)
@@ -1038,10 +1284,11 @@ async def websocket_chat(websocket: WebSocket, student_id: str):
                         profile.profile_version = (profile.profile_version or 1) + 1
                         profile.updated_at = datetime.now()
                         await db.commit()
+                        profile_updated = True
+                        profile_dict = profile_to_dict(profile)
 
                     extracted = result.get("extracted_features", {})
                     summary = extracted.get('profile_summary', '请继续告诉我更多信息。')
-                    # 将可能包含的 HTML 标签清理为纯文本/Markdown
                     import re
                     summary = re.sub(r'<strong>(.*?)</strong>', r'**\1**', summary, flags=re.IGNORECASE)
                     summary = re.sub(r'<br\s*/?>', '\n', summary, flags=re.IGNORECASE)
@@ -1054,7 +1301,7 @@ async def websocket_chat(websocket: WebSocket, student_id: str):
                         "timestamp": datetime.now().isoformat()
                     })
 
-                    print("[WS 智能体] 正在调用 multi_agent_system.run (智能辅导)...") # 👈 加上这行
+                    print("[WS 智能体] 正在调用 multi_agent_system.run (智能辅导)...")
                     result = await multi_agent_system.run(
                         task_type="tutoring",
                         task_params={"question": message},
@@ -1062,42 +1309,56 @@ async def websocket_chat(websocket: WebSocket, student_id: str):
                         messages=messages[-6:],
                         student_id=student_id
                     )
-                    print(f"[WS 智能体] 调用结束 (智能辅导), 返回结果大小: {len(str(result))} 字符") # 👈 加上这行
+                    print(f"[WS 智能体] 调用结束 (智能辅导), 返回结果大小: {len(str(result))} 字符")
 
                     tut_response = result.get("tutoring_response", {})
                     response = tut_response.get("detailed_answer", "请重新描述你的问题。")
 
                 else:
-                    response = "你好！我是你的智能学习助手。你可以：\n1. 和我聊聊你的学习情况（画像构建）\n2. 提问学习问题（智能辅导）\n3. 输入'生成 [科目] [主题] 的学习资料'来获取学习资源"
+                    messages.append({
+                        "role": "user", "content": message,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    print("[WS 智能体] 正在调用 multi_agent_system.run (通用对话)...")
+                    result = await multi_agent_system.run(
+                        task_type="tutoring",
+                        task_params={"question": message},
+                        student_profile=profile_dict,
+                        messages=messages[-6:],
+                        student_id=student_id
+                    )
+                    tut_response = result.get("tutoring_response", {})
+                    response = tut_response.get("detailed_answer", "你好！我是你的智能学习助手。你可以：\n1. 和我聊聊你的学习情况（画像构建）\n2. 提问学习问题（智能辅导）\n3. 输入'生成 [科目] [主题] 的学习资料'来获取学习资源")
 
                 messages.append({
                     "role": "assistant", "content": response,
                     "timestamp": datetime.now().isoformat()
                 })
 
+                # 更新对话标题（第一条用户消息）
+                user_msgs = [m for m in messages if m.get("role") == "user"]
+                if len(user_msgs) == 1 and (not conv.title or conv.title == "新对话"):
+                    conv.title = user_msgs[0].get("content", "")[:30] + ("..." if len(user_msgs[0].get("content", "")) > 30 else "")
+
                 # 保存对话
-                print("[WS 数据库] 正在保存对话记录到数据库...") # 👈 加上这行
+                print("[WS 数据库] 正在保存对话记录到数据库...")
                 if conv:
                     conv.messages = messages
                     conv.updated_at = datetime.now()
-                else:
-                    conv = Conversation(
-                        student_id=student.id,
-                        session_id=str(uuid.uuid4()),
-                        conversation_type=chat_type,
-                        messages=messages
-                    )
-                    db.add(conv)
+                    conv.is_active = True
                 await db.commit()
-                print("[WS 数据库] 对话记录保存成功。") # 👈 加上这行
+                print("[WS 数据库] 对话记录保存成功。")
 
-                print("[WS 发送] 正在将结果推送到前端...") # 👈 加上这行
+                print("[WS 发送] 正在将结果推送到前端...")
                 await websocket.send_json({
                     "type": chat_type,
                     "response": response,
+                    "profile_updated": profile_updated if chat_type == "profile" and 'profile_updated' in locals() else False,
+                    "conversation_id": conv.id if conv else None,
+                    "conversation_title": conv.title if conv else "新对话",
                     "timestamp": datetime.now().isoformat()
                 })
-                print("[WS 流程完成] 等待下一次用户输入。\n") # 👈 加上这行
+                print("[WS 流程完成] 等待下一次用户输入。\n")
 
         except WebSocketDisconnect:
             print(f"学生 {student_id} 断开WebSocket连接")

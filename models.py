@@ -107,8 +107,10 @@ class Conversation(Base):
     student_id = Column(Integer, ForeignKey("students.id"))
     session_id = Column(String(100), index=True)
     conversation_type = Column(String(50))  # "profile_building", "tutoring", "general"
+    title = Column(String(300), default="新对话")  # 对话标题，用于侧边栏展示
     messages = Column(JSON, default=list)   # [{"role": "user/assistant", "content": "...", "timestamp": "..."}]
     extracted_features = Column(JSON, default=dict)  # 从对话中提取的特征
+    is_active = Column(Boolean, default=True)  # 是否为当前活跃对话
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     

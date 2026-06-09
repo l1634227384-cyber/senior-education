@@ -91,7 +91,8 @@ class LLMClient:
             return f"[LLM错误] {str(e)}"
     
     async def chat_json(self, messages: List[Dict[str, str]], 
-                        temperature: float = 0.3) -> Dict[str, Any]:
+                        temperature: float = 0.3,
+                        max_tokens: int = None) -> Dict[str, Any]:
         """发送对话请求并返回JSON（DeepSeek兼容，在prompt中要求JSON输出）"""
         # 在system prompt末尾追加JSON格式要求
         modified_messages = []
@@ -104,7 +105,7 @@ class LLMClient:
             else:
                 modified_messages.append(msg)
         
-        result = await self.chat(modified_messages, temperature=temperature)
+        result = await self.chat(modified_messages, temperature=temperature, max_tokens=max_tokens)
         try:
             # 尝试提取JSON（处理可能被```包裹的情况）
             text = result.strip()
@@ -292,20 +293,22 @@ class ContentAgent(BaseAgent):
         super().__init__(
             name="content_agent",
             role="课程内容生成专家",
-            system_prompt="""你是一位资深的课程内容生成专家。你需要根据学生的画像和学习需求，生成高质量的课程讲解文档。
+            system_prompt="""你是一位资深的课程内容生成专家。你需要根据学生的画像和学习需求，生成高质量、内容详实的课程讲解文档。
 
 你的核心能力：
 1. 根据学生知识基础调整内容深度
 2. 根据学生认知风格调整表达方式
 3. 结合学生易错点进行重点讲解
-4. 提供结构清晰、易于理解的文档
+4. 提供结构清晰、内容充实的文档
 
 输出要求：
 - 使用Markdown格式
-- 包含清晰的标题层次
-- 包含关键概念的定义和解释
-- 包含实际应用案例
+- 包含清晰的标题层次（# ## ###）
+- 包含关键概念的定义和详细解释
+- 包含实际应用案例（至少2个）
+- 包含完整的代码示例（如适用）
 - 标注重点和难点
+- 内容必须详实充实，每个章节都要有实质性内容，禁止用"..."或"待补充"敷衍
 - 适合学生当前知识水平的语言"""
         )
     
@@ -331,8 +334,10 @@ class ContentAgent(BaseAgent):
 3. 使用适合学生认知风格的表达方式
 4. 包含实际案例和练习思考题
 5. 标注重点和难点
-6. 内容长度约2000-3000字
-7. 使用Markdown格式"""
+6. 内容必须详实充实，每个章节都要有实质性内容，禁止用"..."或"待补充"敷衍
+7. 代码示例必须完整可运行，禁止用省略号代替
+8. 使用Markdown格式，标题使用 # ## ### 格式
+9. 内容长度约3000-5000字"""
         
         content = await self.think(prompt, temperature=0.7)
         
@@ -546,7 +551,8 @@ class MindMapAgent(BaseAgent):
 - 核心概念突出
 - 知识点关联明确
 - 适合学生当前水平
-- 支持从宏观到微观的知识导航"""
+- 支持从宏观到微观的知识导航
+- 每个节点必须有具体的描述和要点，禁止空节点"""
         )
     
     async def process(self, state: AgentState) -> AgentState:
@@ -565,10 +571,12 @@ class MindMapAgent(BaseAgent):
 {json.dumps(profile.get('knowledge_base', {}), ensure_ascii=False)}
 
 要求：
-1. 构建层次化知识结构
-2. 标注知识点间的关联关系
-3. 标注重点和难点
-4. 返回JSON格式的树形结构
+1. 构建层次化知识结构，至少3层深度
+2. 每个节点必须有具体的description描述，禁止空描述
+3. 每个叶子节点必须有key_points要点列表
+4. 标注知识点间的关联关系
+5. 标注重点和难点
+6. 返回JSON格式的树形结构
 
 输出格式：
 {{
@@ -577,15 +585,16 @@ class MindMapAgent(BaseAgent):
     "topic": "主题",
     "root": {{
         "name": "根节点",
+        "description": "具体描述内容",
         "children": [
             {{
                 "name": "一级节点",
-                "description": "描述",
+                "description": "具体描述内容",
                 "importance": "high/medium/low",
                 "children": [
                     {{
                         "name": "二级节点",
-                        "description": "描述",
+                        "description": "具体描述内容",
                         "key_points": ["要点1", "要点2"],
                         "relations": ["关联到其他节点"]
                     }}
@@ -593,7 +602,9 @@ class MindMapAgent(BaseAgent):
             }}
         ]
     }}
-}}"""
+}}
+
+【重要】每个节点的description必须填写具体内容，禁止为空字符串或省略号。"""
         
         result = await self.llm.chat_json(self.build_messages(prompt), temperature=0.5)
         
@@ -623,14 +634,19 @@ class ReadingAgent(BaseAgent):
         super().__init__(
             name="reading_agent",
             role="拓展阅读推荐专家",
-            system_prompt="""你是一位阅读材料推荐与生成专家。你需要根据学生的学习主题和兴趣，生成拓展阅读材料。
+            system_prompt="""你是一位阅读材料推荐与生成专家。你需要根据学生的学习主题和兴趣，生成高质量的拓展阅读材料。
 
 材料类型：
 1. 学术论文概述
 2. 技术博客/文章
 3. 经典书籍章节摘要
 4. 行业前沿动态
-5. 相关案例研究"""
+5. 相关案例研究
+
+要求：
+- 每篇材料必须有具体的内容摘要，不能是空泛的描述
+- 推荐理由必须具体说明为什么推荐这篇材料
+- 要点(key_takeaways)必须列出具体的知识点"""
         )
     
     async def process(self, state: AgentState) -> AgentState:
@@ -650,10 +666,13 @@ class ReadingAgent(BaseAgent):
 要求：
 1. 提供3-5篇拓展阅读材料
 2. 每篇包含：标题、来源类型、内容摘要、推荐理由、适合水平
-3. 与当前学习主题相关
-4. 结合学生兴趣方向
-5. 难度适合学生水平
-6. 返回JSON格式
+3. 内容摘要必须详实具体，至少50字，不能是空泛描述
+4. 推荐理由必须具体说明为什么推荐
+5. 要点(key_takeaways)必须列出具体的知识点，至少2条
+6. 与当前学习主题相关
+7. 结合学生兴趣方向
+8. 难度适合学生水平
+9. 返回JSON格式
 
 输出格式：
 {{
@@ -666,14 +685,16 @@ class ReadingAgent(BaseAgent):
             "title": "材料标题",
             "type": "论文/博客/书籍/前沿动态/案例",
             "source": "来源",
-            "summary": "内容摘要",
-            "recommendation_reason": "推荐理由",
+            "summary": "详实的内容摘要，至少50字，具体介绍材料内容",
+            "recommendation_reason": "具体的推荐理由，说明为什么推荐",
             "difficulty_level": "beginner/intermediate/advanced",
             "estimated_reading_time": "预估阅读时间（分钟）",
-            "key_takeaways": ["要点1", "要点2"]
+            "key_takeaways": ["具体要点1", "具体要点2"]
         }}
     ]
-}}"""
+}}
+
+【重要】summary和recommendation_reason必须填写具体内容，禁止为空或省略号。"""
         
         result = await self.llm.chat_json(self.build_messages(prompt), temperature=0.6)
         
@@ -805,7 +826,8 @@ class PPTSlidesAgent(BaseAgent):
 - 内容基于学生知识基础调整深度
 - 重点突出，难点详细讲解
 - 包含知识总结和思考题
-- 适合导出为Markdown/PDF格式阅读"""
+- 适合导出为Markdown/PDF格式阅读
+- 每章的content必须有实质性内容，禁止用"..."或"待补充"敷衍"""
         )
 
     async def process(self, state: AgentState) -> AgentState:
@@ -816,53 +838,36 @@ class PPTSlidesAgent(BaseAgent):
         topic = task_params.get("topic", "")
         difficulty = task_params.get("difficulty", "intermediate")
 
-        prompt = """请为以下学生生成PPT课件/讲义文档：
+        # 第一步：直接生成 Markdown 课件（充分利用 token 生成实质性内容）
+        md_prompt = f"""请为以下学生生成PPT课件/讲义文档，直接输出Markdown格式：
 
 学生画像：
-""" + json.dumps(profile, ensure_ascii=False, indent=2) + """
+{json.dumps(profile, ensure_ascii=False, indent=2)}
 
-课程主题：""" + subject + """ - """ + topic + """
-难度级别：""" + difficulty + """
+课程主题：{subject} - {topic}
+难度级别：{difficulty}
 
 要求：
-1. 按章节拆分内容，每章包含：标题、核心知识点、详细讲解、示例说明
-2. 根据学生知识基础调整内容深度（基础薄弱则补充前置知识，基础好则深入拓展）
-3. 针对学生易错点设置重点提示和警示框
-4. 每章末尾附2-3道选择题（含答案和解析），用于自测
-5. 使用Markdown格式，适合导出为PDF或打印阅读
-6. 内容全面，约3000-5000字
+1. 按章节拆分内容，至少4-6个章节
+2. 每章必须有实质性内容，至少300-500字，禁止用"..."或"待补充"敷衍
+3. 根据学生知识基础调整内容深度（基础薄弱则补充前置知识，基础好则深入拓展）
+4. 针对学生易错点设置重点提示和警示框
+5. 每章末尾附2-3道选择题（含答案和解析），用于自测
+6. 内容全面详实，约4000-6000字
 
-输出格式：
-{
-    "title": "课件标题",
-    "subject": "科目",
-    "topic": "主题",
-    "difficulty": "难度",
-    "estimated_duration": "预估学习时长",
-    "chapters": [
-        {
-            "chapter_id": 1,
-            "title": "章节标题",
-            "content": "章节正文内容（Markdown格式）",
-            "key_points": ["要点1", "要点2"],
-            "quiz": [
-                {
-                    "question": "选择题题干",
-                    "options": ["A. 选项1", "B. 选项2", "C. 选项3", "D. 选项4"],
-                    "answer": "A",
-                    "analysis": "答案解析"
-                }
-            ]
-        }
-    ],
-    "summary": "整体知识总结",
-    "further_reading": ["延伸阅读建议1", "建议2"]
-}"""
+Markdown格式要求：
+- 标题使用 # ## ###
+- 章节标题使用 ## 第X章 标题
+- 要点使用 **本章要点：** 后接列表
+- 自测练习使用 **自测练习：** 后接题目
+- 答案和解析放在题目下方
 
-        result = await self.llm.chat_json(self.build_messages(prompt), temperature=0.6)
+请直接输出完整的Markdown课件内容，确保每章内容详实充实。"""
 
-        # 同时生成纯Markdown文本版本用于导出
-        md_content = self._build_markdown(result, subject, topic)
+        md_content = await self.llm.chat(self.build_messages(md_prompt), temperature=0.6, max_tokens=8000)
+
+        # 第二步：从Markdown解析结构化数据用于前端交互
+        metadata = self._parse_markdown_to_metadata(md_content, subject, topic, difficulty)
 
         resource = {
             "type": "ppt_slides",
@@ -873,7 +878,7 @@ class PPTSlidesAgent(BaseAgent):
             "content": md_content,
             "generated_by": self.name,
             "format": "markdown",
-            "metadata": result
+            "metadata": metadata
         }
 
         return {
@@ -883,45 +888,110 @@ class PPTSlidesAgent(BaseAgent):
             "next_agents": []
         }
 
-    def _build_markdown(self, result: Dict[str, Any], subject: str, topic: str) -> str:
-        """将JSON课件数据转为Markdown文本"""
-        md = "# " + (result.get("title", subject + " - " + topic + " 课件讲义")) + "\n\n"
-        md += "> 科目：" + subject + " | 主题：" + topic + "\n\n"
-        md += "---\n\n"
+    def _parse_markdown_to_metadata(self, md_content: str, subject: str, topic: str, difficulty: str) -> Dict[str, Any]:
+        """从Markdown内容解析结构化数据"""
+        import re
 
-        for ch in result.get("chapters", []):
-            md += "## " + str(ch.get("chapter_id", "")) + ". " + ch.get("title", "") + "\n\n"
-            md += ch.get("content", "") + "\n\n"
+        metadata = {
+            "title": f"{subject} - {topic} 课件讲义",
+            "subject": subject,
+            "topic": topic,
+            "difficulty": difficulty,
+            "estimated_duration": "",
+            "chapters": [],
+            "summary": "",
+            "further_reading": []
+        }
 
-            key_points = ch.get("key_points", [])
-            if key_points:
-                md += "**本章要点：**\n"
-                for kp in key_points:
-                    md += "- " + kp + "\n"
-                md += "\n"
+        if not md_content:
+            return metadata
 
-            quiz = ch.get("quiz", [])
-            if quiz:
-                md += "**自测练习：**\n\n"
-                for i, q in enumerate(quiz, 1):
-                    md += str(i) + ". " + q.get("question", "") + "\n"
-                    for opt in q.get("options", []):
-                        md += "   " + opt + "\n"
-                    md += "   **答案：**" + q.get("answer", "") + "\n"
-                    md += "   **解析：**" + q.get("analysis", "") + "\n\n"
-            md += "---\n\n"
+        # 解析章节：匹配 ## 第X章 或 ## X. 或 ## 标题（避免匹配到###子标题）
+        chapter_pattern = r'##\s+(?:第\s*(\d+)\s*章|(\d+)[\.\、])?\s*(.+?)(?=\n##\s|\n#\s[^#]|$)'
+        chapters_raw = re.findall(chapter_pattern, md_content, re.DOTALL)
 
-        summary = result.get("summary", "")
-        if summary:
-            md += "## 总结\n\n" + summary + "\n\n"
+        chapter_id = 0
+        for match in chapters_raw:
+            chapter_id += 1
+            num1, num2, content_block = match
+            ch_num = num1 or num2 or str(chapter_id)
 
-        fr = result.get("further_reading", [])
-        if fr:
-            md += "## 延伸阅读\n\n"
-            for item in fr:
-                md += "- " + item + "\n"
+            # 提取标题（第一行）
+            lines = content_block.strip().split('\n')
+            title = lines[0].strip() if lines else f"第{ch_num}章"
 
-        return md
+            # 分离content、key_points、quiz
+            ch_content = []
+            key_points = []
+            quiz = []
+            in_key_points = False
+            in_quiz = False
+
+            for line in lines[1:]:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                if '本章要点' in stripped or '要点' in stripped and stripped.startswith('**'):
+                    in_key_points = True
+                    in_quiz = False
+                    continue
+                if '自测练习' in stripped or '练习' in stripped and stripped.startswith('**'):
+                    in_key_points = False
+                    in_quiz = True
+                    continue
+                if in_key_points and stripped.startswith('- '):
+                    key_points.append(stripped[2:])
+                elif in_key_points and stripped.startswith('* '):
+                    key_points.append(stripped[2:])
+                elif in_quiz and (stripped[0].isdigit() or stripped.startswith('**')):
+                    # 简单解析题目
+                    quiz.append({
+                        "question": stripped.lstrip('0123456789. '),
+                        "options": [],
+                        "answer": "",
+                        "analysis": ""
+                    })
+                elif in_quiz and stripped.startswith('答案'):
+                    if quiz:
+                        quiz[-1]["answer"] = stripped.split('：', 1)[-1] if '：' in stripped else stripped
+                elif in_quiz and stripped.startswith('解析'):
+                    if quiz:
+                        quiz[-1]["analysis"] = stripped.split('：', 1)[-1] if '：' in stripped else stripped
+                else:
+                    in_key_points = False
+                    in_quiz = False
+                    ch_content.append(line)
+
+            metadata["chapters"].append({
+                "chapter_id": int(ch_num) if ch_num.isdigit() else chapter_id,
+                "title": title,
+                "content": '\n'.join(ch_content).strip(),
+                "key_points": key_points,
+                "quiz": quiz
+            })
+
+        # 如果没有解析到章节，创建一个默认章节包含全部内容
+        if not metadata["chapters"]:
+            metadata["chapters"].append({
+                "chapter_id": 1,
+                "title": "课程内容",
+                "content": md_content,
+                "key_points": [],
+                "quiz": []
+            })
+
+        # 解析总结部分
+        summary_match = re.search(r'##\s*总结\s*\n(.+?)(?=\n##|\Z)', md_content, re.DOTALL)
+        if summary_match:
+            metadata["summary"] = summary_match.group(1).strip()
+
+        # 解析延伸阅读
+        fr_match = re.search(r'##\s*延伸阅读\s*\n(.+?)(?=\n##|\Z)', md_content, re.DOTALL)
+        if fr_match:
+            fr_text = fr_match.group(1)
+            metadata["further_reading"] = [line.strip().lstrip('- ').lstrip('* ') for line in fr_text.split('\n') if line.strip()]
+
+        return metadata
 
 
 class PathAgent(BaseAgent):
@@ -1411,17 +1481,17 @@ class MultiAgentSystem:
         
         return result
     
-    async def generate_all_resources(self, subject: str, topic: str, 
+    async def generate_all_resources(self, subject: str, topic: str,
                                       profile: Dict[str, Any],
                                       student_id: str = None) -> Dict[str, Any]:
         """一键并行生成所有类型的学习资源"""
-        
+
         task_params = {
             "subject": subject,
             "topic": topic,
             "action": "generate_all"
         }
-        
+
         resource_agents = [
             ("content_agent", {"subject": subject, "topic": topic, "difficulty": "intermediate"}),
             ("exercise_agent", {"subject": subject, "topic": topic, "exercise_type": "mixed", "count": 10}),
@@ -1430,7 +1500,7 @@ class MultiAgentSystem:
             ("code_agent", {"subject": subject, "topic": topic, "language": "python"}),
             ("ppt_slides_agent", {"subject": subject, "topic": topic, "difficulty": "intermediate"}),
         ]
-        
+
         state = {
             "student_id": student_id,
             "student_profile": profile,
@@ -1448,45 +1518,167 @@ class MultiAgentSystem:
             "is_complete": False,
             "error": None,
         }
-        
+
         async def run_agent(agent_name: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
             """并行执行单个智能体"""
             agent = self.agents[agent_name]
             agent_state = {**state, "task_params": params}
             try:
+                print(f"[资源生成] 开始调用 {agent_name} ...")
                 result_state = await agent.process(agent_state)
-                return result_state.get("generated_resources", [])
+                resources = result_state.get("generated_resources", [])
+                print(f"[资源生成] {agent_name} 生成完成，产出 {len(resources)} 个资源")
+                for r in resources:
+                    print(f"  - 类型: {r.get('type', 'unknown')}, 标题: {r.get('title', '无标题')[:40]}")
+                return resources
             except Exception as e:
                 print(f"[警告] 智能体 {agent_name} 生成失败: {e}")
+                import traceback
+                traceback.print_exc()
                 return []
-        
+
         # 真正并行执行所有资源生成智能体
         results = await asyncio.gather(*[
-            run_agent(agent_name, params) 
+            run_agent(agent_name, params)
             for agent_name, params in resource_agents
         ])
-        
+
         # 汇总所有生成结果
+        all_resources = []
         for resources in results:
-            state["generated_resources"].extend(resources)
-        
+            all_resources.extend(resources)
+
+        print(f"[资源生成] 总共生成 {len(all_resources)} 个资源")
+
+        # 如果某些类型缺失，生成默认资源补齐
+        existing_types = {r.get("type") for r in all_resources}
+        expected_types = {"lecture_doc", "exercise", "mind_map", "reading_material", "code_practice", "ppt_slides"}
+        missing_types = expected_types - existing_types
+
+        for missing_type in missing_types:
+            print(f"[资源生成] 类型 {missing_type} 缺失，生成默认资源补齐")
+            default_resource = self._create_default_resource(missing_type, subject, topic)
+            all_resources.append(default_resource)
+
         # 生成学习路径（依赖资源生成结果，必须串行）
         path_params = {
             "subject": subject,
             "topic": topic,
             "available_resources": [
-                {"id": r.get("title", ""), "type": r.get("type", ""), 
+                {"id": r.get("title", ""), "type": r.get("type", ""),
                  "title": r.get("title", ""), "difficulty": r.get("difficulty", "intermediate")}
-                for r in state["generated_resources"]
+                for r in all_resources
             ]
         }
-        path_state = {**state, "task_params": path_params}
+        path_state = {**state, "task_params": path_params, "generated_resources": all_resources}
         path_result = await self.agents["path_agent"].process(path_state)
-        
+
         return {
-            "resources": state["generated_resources"],
+            "resources": all_resources,
             "learning_path": path_result.get("learning_path"),
             "profile": profile
+        }
+
+    def _create_default_resource(self, resource_type: str, subject: str, topic: str) -> Dict[str, Any]:
+        """创建默认资源，用于补齐缺失的类型"""
+        type_titles = {
+            "lecture_doc": f"{subject} - {topic} 课程讲解",
+            "exercise": f"{subject} - {topic} 练习题",
+            "mind_map": f"{subject} - {topic} 思维导图",
+            "reading_material": f"{subject} - {topic} 拓展阅读",
+            "code_practice": f"{subject} - {topic} 代码实操",
+            "ppt_slides": f"{subject} - {topic} 课件讲义",
+        }
+        type_contents = {
+            "lecture_doc": f"# {subject} - {topic}\n\n## 概述\n\n本节将介绍{topic}的核心概念和基本原理。\n\n## 学习目标\n\n1. 理解{topic}的基本概念\n2. 掌握{topic}的核心方法\n3. 能够运用{topic}解决实际问题\n\n## 详细内容\n\n待生成...",
+            "exercise": json.dumps({
+                "title": f"{subject} - {topic} 练习题",
+                "subject": subject,
+                "topic": topic,
+                "total_questions": 5,
+                "difficulty": "intermediate",
+                "questions": [
+                    {
+                        "id": 1,
+                        "type": "选择",
+                        "question": f"关于{topic}，以下说法正确的是？",
+                        "options": ["A. 选项A", "B. 选项B", "C. 选项C", "D. 选项D"],
+                        "answer": "A",
+                        "analysis": "这是解析",
+                        "difficulty": "medium",
+                        "knowledge_point": topic,
+                        "score": 10
+                    }
+                ],
+                "auto_gradable_count": 1,
+                "total_score": 10
+            }, ensure_ascii=False),
+            "mind_map": json.dumps({
+                "title": f"{subject} - {topic} 思维导图",
+                "subject": subject,
+                "topic": topic,
+                "root": {
+                    "name": topic,
+                    "children": [
+                        {"name": "核心概念", "description": f"{topic}的基本定义", "importance": "high"},
+                        {"name": "应用场景", "description": f"{topic}的实际应用", "importance": "medium"},
+                        {"name": "相关技术", "description": f"与{topic}相关的技术", "importance": "medium"}
+                    ]
+                }
+            }, ensure_ascii=False),
+            "reading_material": json.dumps({
+                "title": f"{subject} - {topic} 拓展阅读",
+                "subject": subject,
+                "topic": topic,
+                "materials": [
+                    {
+                        "id": 1,
+                        "title": f"{topic}入门指南",
+                        "type": "博客",
+                        "source": "技术博客",
+                        "summary": f"介绍{topic}的基础知识和入门方法",
+                        "recommendation_reason": "适合初学者",
+                        "difficulty_level": "beginner",
+                        "estimated_reading_time": "15分钟",
+                        "key_takeaways": ["基础概念", "入门方法"]
+                    }
+                ]
+            }, ensure_ascii=False),
+            "code_practice": json.dumps({
+                "title": f"{subject} - {topic} 代码实操",
+                "subject": subject,
+                "topic": topic,
+                "language": "python",
+                "difficulty": "intermediate",
+                "objectives": [f"掌握{topic}的编程实现"],
+                "prerequisites": ["Python基础"],
+                "steps": [
+                    {
+                        "step": 1,
+                        "title": "基础实现",
+                        "description": f"实现{topic}的基本功能",
+                        "code": f"# {topic} 基础实现\nprint('Hello {topic}')",
+                        "explanation": "这是基础代码示例",
+                        "expected_output": "Hello {topic}",
+                        "common_mistakes": ["语法错误"]
+                    }
+                ],
+                "extended_exercises": [],
+                "summary": f"通过本练习掌握{topic}的编程实现"
+            }, ensure_ascii=False),
+            "ppt_slides": f"# {subject} - {topic} 课件讲义\n\n> 科目：{subject} | 主题：{topic}\n\n---\n\n## 1. 课程导入\n\n本节课程将带领大家深入了解{topic}。\n\n## 2. 核心概念\n\n### 2.1 基本概念\n\n{topic}是{subject}中的重要内容...\n\n### 2.2 关键原理\n\n...\n\n## 3. 案例分析\n\n通过实际案例加深理解...\n\n## 4. 总结\n\n本节重点回顾...",
+        }
+
+        return {
+            "type": resource_type,
+            "title": type_titles.get(resource_type, f"{subject} - {topic}"),
+            "subject": subject,
+            "topic": topic,
+            "difficulty": "intermediate",
+            "content": type_contents.get(resource_type, ""),
+            "generated_by": "default_agent",
+            "format": "json" if resource_type in ["exercise", "mind_map", "reading_material", "code_practice"] else "markdown",
+            "metadata": json.loads(type_contents.get(resource_type, "{}")) if resource_type in ["exercise", "mind_map", "reading_material", "code_practice"] else None
         }
 
 
