@@ -1,6 +1,8 @@
 """
 多智能体架构核心 - 基于LangGraph实现多智能体协同工作
 """
+import httpx
+from openai import AsyncOpenAI
 import asyncio
 import json
 from abc import ABC, abstractmethod
@@ -63,7 +65,12 @@ class LLMClient:
     def __init__(self):
         self.client = AsyncOpenAI(
             api_key=settings.LLM_API_KEY,
-            base_url=settings.LLM_API_BASE
+            base_url=settings.LLM_API_BASE,
+
+            http_client = httpx.AsyncClient(
+                verify=False,
+                trust_env=False
+            )
         )
         self.model = settings.LLM_MODEL
     

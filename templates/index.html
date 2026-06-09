@@ -96,16 +96,69 @@
             letter-spacing: 0.5px;
             margin-bottom: 12px;
         }
-        .student-form { display: flex; flex-direction: column; gap: 8px; }
-        .student-form input, .student-form select {
-            padding: 8px 12px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            font-size: 14px;
-            outline: none;
-            transition: border-color 0.2s;
+
+        /* 学生信息展示区 */
+        .student-info-display {
+            background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 12px;
         }
-        .student-form input:focus { border-color: var(--primary); }
+        .student-info-display .student-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin-bottom: 4px;
+        }
+        .student-info-display .student-details {
+            font-size: 13px;
+            color: var(--text-light);
+            margin-bottom: 8px;
+        }
+        .student-info-display .logout-btn {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 12px;
+            width: 100%;
+            margin-top: 8px;
+        }
+        .student-info-display .logout-btn:hover {
+            background: #DC2626;
+        }
+
+        /* 学习进度展示 */
+        .progress-section {
+            background: #F0F9FF;
+            border-radius: var(--radius);
+            padding: 12px;
+            margin-top: 12px;
+        }
+        .progress-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        .progress-bar {
+            flex: 1;
+            height: 6px;
+            background: #E0E7FF;
+            border-radius: 3px;
+            margin: 0 8px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--success);
+            border-radius: 3px;
+            transition: width 0.5s;
+        }
+
         .btn {
             padding: 8px 16px;
             border: none;
@@ -368,6 +421,77 @@
             margin: 0 auto 16px;
         }
 
+        /* 登录/注册模态框 */
+        .auth-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .auth-modal {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 32px;
+            width: 400px;
+            max-width: 90vw;
+            box-shadow: var(--shadow-lg);
+        }
+        .auth-modal h2 {
+            text-align: center;
+            margin-bottom: 24px;
+            color: var(--primary);
+        }
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .auth-form input {
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .auth-form input:focus {
+            border-color: var(--primary);
+        }
+        .auth-form button {
+            padding: 12px;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 24px;
+            border-bottom: 2px solid var(--border);
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: var(--text-light);
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+        }
+        .auth-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            font-weight: 600;
+        }
+
         /* 模态框 */
         .modal-overlay {
             position: fixed;
@@ -508,6 +632,33 @@
     </style>
 </head>
 <body>
+    <!-- 登录/注册模态框 -->
+    <div class="auth-modal-overlay" id="authModal">
+        <div class="auth-modal">
+            <h2>🎓 智能学习系统</h2>
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="switchAuthTab('login')">登录</button>
+                <button class="auth-tab" onclick="switchAuthTab('register')">注册</button>
+            </div>
+            
+            <!-- 登录表单 -->
+            <div id="loginForm" class="auth-form">
+                <input type="text" id="loginStudentId" placeholder="学号" autocomplete="username">
+                <input type="text" id="loginStudentName" placeholder="姓名" autocomplete="name">
+                <button class="btn btn-primary" onclick="loginStudent()">登录</button>
+            </div>
+            
+            <!-- 注册表单 -->
+            <div id="registerForm" class="auth-form" style="display:none;">
+                <input type="text" id="registerStudentId" placeholder="学号" autocomplete="username">
+                <input type="text" id="registerStudentName" placeholder="姓名" autocomplete="name">
+                <input type="text" id="registerStudentMajor" placeholder="专业（可选）">
+                <input type="text" id="registerStudentGrade" placeholder="年级（可选）">
+                <button class="btn btn-success" onclick="registerStudent()">注册</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 导航栏 -->
     <nav class="navbar">
         <div class="logo">
@@ -528,19 +679,34 @@
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-section">
                 <h3>👤 学生信息</h3>
-                <div class="student-form" id="studentForm">
-                    <input type="text" id="studentId" placeholder="学号" value="2024001">
-                    <input type="text" id="studentName" placeholder="姓名" value="张同学">
-                    <input type="text" id="studentMajor" placeholder="专业" value="计算机科学与技术">
-                    <input type="text" id="studentGrade" placeholder="年级" value="大三">
-                    <div style="display:flex;gap:8px;">
-                        <button class="btn btn-primary" style="flex:1;" onclick="registerStudent()">注册</button>
-                        <button class="btn btn-secondary" style="flex:1;" onclick="loginStudent()">登录</button>
-                    </div>
+                <div id="studentInfoDisplay" class="student-info-display" style="display:none;">
+                    <div class="student-name" id="displayStudentName">加载中...</div>
+                    <div class="student-details" id="displayStudentDetails">加载中...</div>
+                    <button class="logout-btn" onclick="logout()">🚪 退出登录</button>
                 </div>
+                
                 <div id="profileDisplay" class="profile-card" style="display:none;">
                     <div style="font-weight:600;margin-bottom:8px;">📋 学习画像</div>
                     <div id="profileDimensions"></div>
+                </div>
+
+                <!-- 学习进度展示 -->
+                <div class="progress-section" id="progressSection" style="display:none;">
+                    <div style="font-weight:600;margin-bottom:8px;font-size:14px;">📈 学习进度</div>
+                    <div class="progress-item">
+                        <span>资源学习</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="resourceProgress" style="width:0%"></div>
+                        </div>
+                        <span id="resourceProgressText">0%</span>
+                    </div>
+                    <div class="progress-item">
+                        <span>路径完成</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="pathProgress" style="width:0%"></div>
+                        </div>
+                        <span id="pathProgressText">0%</span>
+                    </div>
                 </div>
             </div>
 
@@ -587,7 +753,7 @@
                             1️⃣ <strong>和我聊聊你的学习情况</strong> — 我会自动构建你的学习画像<br>
                             2️⃣ <strong>提问学习问题</strong> — 获取多模态辅导解答<br>
                             3️⃣ <strong>告诉我你想学什么</strong> — 例如「生成 数据结构 二叉树 的学习资料」<br><br>
-                            请先在左侧注册你的信息，然后开始学习之旅！
+                            请先登录或注册账号，然后开始学习之旅！
                         </div>
                     </div>
                 </div>
@@ -658,6 +824,234 @@
         let learningPath = null;
         let evaluations = [];
 
+        // 切换登录/注册标签
+        function switchAuthTab(tab) {
+            document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (tab === 'login') {
+                document.getElementById('loginForm').style.display = 'flex';
+                document.getElementById('registerForm').style.display = 'none';
+            } else {
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('registerForm').style.display = 'flex';
+            }
+        }
+
+        // 显示/隐藏加载
+        function showLoading(text = '处理中...') {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        // 注册学生
+        async function registerStudent() {
+            const studentId = document.getElementById('registerStudentId').value.trim();
+            const name = document.getElementById('registerStudentName').value.trim();
+            const major = document.getElementById('registerStudentMajor').value.trim();
+            const grade = document.getElementById('registerStudentGrade').value.trim();
+
+            if (!studentId || !name) {
+                alert('请填写学号和姓名');
+                return;
+            }
+
+            showLoading('注册中...');
+            try {
+                const resp = await fetch('/api/students/register', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({student_id: studentId, name, major, grade})
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    alert('❌ ' + (data.detail || '注册失败'));
+                    return;
+                }
+
+                currentStudentId = studentId;
+                alert(`✅ 学生 ${name} 注册成功！`);
+                
+                // 隐藏登录模态框
+                document.getElementById('authModal').style.display = 'none';
+                
+                // 显示学生信息
+                displayStudentInfo(data.student);
+                
+                // 建立 WebSocket 连接
+                connectWebSocket(studentId);
+
+                // 加载画像和历史资源
+                await loadProfile();
+                await loadStudentResources();
+                await loadSystemStats();
+                await loadLearningProgress();
+            } catch (err) {
+                alert('注册失败: ' + err.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 登录学生
+        async function loginStudent() {
+            const studentId = document.getElementById('loginStudentId').value.trim();
+            const name = document.getElementById('loginStudentName').value.trim();
+
+            if (!studentId || !name) {
+                alert('请填写学号和姓名');
+                return;
+            }
+
+            showLoading('登录中...');
+            try {
+                const resp = await fetch('/api/students/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({student_id: studentId, name})
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    alert('❌ ' + (data.detail || '登录失败'));
+                    return;
+                }
+
+                currentStudentId = studentId;
+                
+                // 隐藏登录模态框
+                document.getElementById('authModal').style.display = 'none';
+                
+                // 显示学生信息
+                displayStudentInfo(data.student);
+                
+                alert(`✅ 欢迎回来，${data.student.name}！`);
+
+                // 建立 WebSocket 连接
+                connectWebSocket(studentId);
+
+                // 加载画像和历史资源
+                await loadProfile();
+                await loadStudentResources();
+                await loadSystemStats();
+                await loadLearningProgress();
+            } catch (err) {
+                alert('登录失败: ' + err.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 显示学生信息
+        function displayStudentInfo(student) {
+            document.getElementById('studentInfoDisplay').style.display = 'block';
+            document.getElementById('displayStudentName').textContent = student.name || '未知';
+            
+            let details = '';
+            if (student.major) details += student.major + ' ';
+            if (student.grade) details += student.grade + ' ';
+            if (student.university) details += student.university;
+            document.getElementById('displayStudentDetails').textContent = details || '暂无详细信息';
+            
+            // 显示学习进度区域
+            document.getElementById('progressSection').style.display = 'block';
+        }
+
+        // 退出登录
+        function logout() {
+            if (confirm('确定要退出登录吗？')) {
+                currentStudentId = null;
+                currentProfile = null;
+                allResources = [];
+                learningPath = null;
+                evaluations = [];
+                
+                // 关闭 WebSocket 连接
+                if (ws) {
+                    ws.close();
+                    ws = null;
+                }
+                
+                // 清空显示
+                document.getElementById('studentInfoDisplay').style.display = 'none';
+                document.getElementById('profileDisplay').style.display = 'none';
+                document.getElementById('progressSection').style.display = 'none';
+                
+                // 清空聊天记录
+                document.getElementById('chatMessages').innerHTML = `
+                    <div class="chat-message assistant">
+                        <div class="chat-avatar">🤖</div>
+                        <div class="chat-bubble">
+                            <strong>欢迎使用高等教育个性化学习资源智能体系统！</strong><br><br>
+                            我是你的智能学习助手，你可以：<br>
+                            1️⃣ <strong>和我聊聊你的学习情况</strong> — 我会自动构建你的学习画像<br>
+                            2️⃣ <strong>提问学习问题</strong> — 获取多模态辅导解答<br>
+                            3️⃣ <strong>告诉我你想学什么</strong> — 例如「生成 数据结构 二叉树 的学习资料」<br><br>
+                            请先登录或注册账号，然后开始学习之旅！
+                        </div>
+                    </div>
+                `;
+                
+                // 清空其他视图
+                document.getElementById('resourcesView').innerHTML = `
+                    <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-light);">
+                        <div style="font-size:48px;">📚</div>
+                        <p>暂无学习资源，请先在对话中说「生成 [科目] [主题] 的学习资料」</p>
+                    </div>
+                `;
+                document.getElementById('pathView').innerHTML = `
+                    <div style="text-align:center;padding:40px;color:var(--text-light);">
+                        <div style="font-size:48px;">🗺️</div>
+                        <p>暂无学习路径，请先生成学习资源或点击「规划路径」</p>
+                    </div>
+                `;
+                document.getElementById('evaluationView').innerHTML = `
+                    <div style="text-align:center;padding:40px;color:var(--text-light);">
+                        <div style="font-size:48px;">📊</div>
+                        <p>暂无评估数据，请先进行学习活动后点击「学习评估」</p>
+                    </div>
+                `;
+                
+                // 显示登录模态框
+                document.getElementById('authModal').style.display = 'flex';
+            }
+        }
+
+        // 加载学习进度
+        async function loadLearningProgress() {
+            if (!currentStudentId) return;
+            
+            try {
+                // 获取学生资源数量
+                const resResp = await fetch(`/api/students/${currentStudentId}/resources`);
+                const resData = await resResp.json();
+                const resourceCount = resData.total || 0;
+                
+                // 获取学习路径
+                try {
+                    const pathResp = await fetch(`/api/students/${currentStudentId}/path`);
+                    if (pathResp.ok) {
+                        const pathData = await pathResp.json();
+                        const progress = pathData.progress || 0;
+                        document.getElementById('pathProgress').style.width = progress + '%';
+                        document.getElementById('pathProgressText').textContent = Math.round(progress) + '%';
+                    }
+                } catch (e) {
+                    // 路径不存在
+                }
+                
+                // 计算资源学习进度（假设目标是10个资源）
+                const resourceProgress = Math.min((resourceCount / 10) * 100, 100);
+                document.getElementById('resourceProgress').style.width = resourceProgress + '%';
+                document.getElementById('resourceProgressText').textContent = Math.round(resourceProgress) + '%';
+                
+            } catch (err) {
+                console.log('学习进度加载失败:', err);
+            }
+        }
+
         // 切换标签
         function switchTab(tab) {
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -679,103 +1073,6 @@
             }
         });
 
-        // 显示/隐藏加载
-        function showLoading(text = '处理中...') {
-            document.getElementById('loadingText').textContent = text;
-            document.getElementById('loadingOverlay').style.display = 'flex';
-        }
-        function hideLoading() {
-            document.getElementById('loadingOverlay').style.display = 'none';
-        }
-
-        // 注册学生
-        async function registerStudent() {
-            const studentId = document.getElementById('studentId').value.trim();
-            const name = document.getElementById('studentName').value.trim();
-            const major = document.getElementById('studentMajor').value.trim();
-            const grade = document.getElementById('studentGrade').value.trim();
-
-            if (!studentId || !name) {
-                alert('请填写学号和姓名');
-                return;
-            }
-
-            showLoading('注册中...');
-            try {
-                const resp = await fetch('/api/students/register', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({student_id: studentId, name, major, grade})
-                });
-                const data = await resp.json();
-                if (!resp.ok) {
-                    alert('❌ ' + (data.detail || '注册失败'));
-                    return;
-                }
-
-                currentStudentId = studentId;
-                alert(`✅ 学生 ${name} 注册成功！现在可以开始对话构建画像了。`);
-
-                // 建立 WebSocket 连接
-                connectWebSocket(studentId);
-
-                // 加载画像和历史资源
-                await loadProfile();
-                await loadStudentResources();
-                await loadSystemStats();
-            } catch (err) {
-                alert('注册失败: ' + err.message);
-            } finally {
-                hideLoading();
-            }
-        }
-
-        // 登录学生
-        async function loginStudent() {
-            const studentId = document.getElementById('studentId').value.trim();
-            const name = document.getElementById('studentName').value.trim();
-
-            if (!studentId || !name) {
-                alert('请填写学号和姓名');
-                return;
-            }
-
-            showLoading('登录中...');
-            try {
-                const resp = await fetch('/api/students/login', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({student_id: studentId, name})
-                });
-                const data = await resp.json();
-                if (!resp.ok) {
-                    alert('❌ ' + (data.detail || '登录失败'));
-                    return;
-                }
-
-                currentStudentId = studentId;
-                // 填充用户信息
-                if (data.student) {
-                    document.getElementById('studentName').value = data.student.name || '';
-                    document.getElementById('studentMajor').value = data.student.major || '';
-                    document.getElementById('studentGrade').value = data.student.grade || '';
-                }
-                alert(`✅ 欢迎回来，${data.student.name}！`);
-
-                // 建立 WebSocket 连接
-                connectWebSocket(studentId);
-
-                // 加载画像和历史资源
-                await loadProfile();
-                await loadStudentResources();
-                await loadSystemStats();
-            } catch (err) {
-                alert('登录失败: ' + err.message);
-            } finally {
-                hideLoading();
-            }
-        }
-
         // 加载画像
         async function loadProfile() {
             if (!currentStudentId) return;
@@ -792,7 +1089,6 @@
         // 认知风格中文映射
         function getCognitiveStyleLabel(cs) {
             if (!cs || !cs.type || cs.type === 'unknown') {
-                // 尝试根据分数推断
                 const v = cs?.visual_score || 0;
                 const ve = cs?.verbal_score || 0;
                 const a = cs?.active_score || 0;
@@ -907,6 +1203,7 @@
                 const data = await resp.json();
                 allResources = data.resources || [];
                 renderResources();
+                await loadLearningProgress();
             } catch (err) {
                 console.log('历史资源加载失败:', err);
             }
@@ -965,7 +1262,8 @@
             
             if (!message) return;
             if (!currentStudentId) {
-                alert('请先在左侧注册学生信息');
+                alert('请先登录');
+                document.getElementById('authModal').style.display = 'flex';
                 return;
             }
             
@@ -1119,6 +1417,9 @@
 
             // 自动切换到资源视图
             switchTab('resources');
+            
+            // 更新学习进度
+            await loadLearningProgress();
         }
 
         // 获取资源类型图标
@@ -1594,12 +1895,16 @@
             }
             
             container.innerHTML = html;
+            
+            // 更新学习进度
+            loadLearningProgress();
         }
 
         // 快速生成资源
         async function quickGenerate() {
             if (!currentStudentId) {
-                alert('请先注册学生信息');
+                alert('请先登录');
+                document.getElementById('authModal').style.display = 'flex';
                 return;
             }
             const subject = prompt('请输入科目（如：数据结构）：', '数据结构');
@@ -1616,7 +1921,8 @@
         // 快速评估
         async function quickEvaluate() {
             if (!currentStudentId) {
-                alert('请先注册学生信息');
+                alert('请先登录');
+                document.getElementById('authModal').style.display = 'flex';
                 return;
             }
             
@@ -1685,7 +1991,8 @@
         // 快速规划路径
         async function quickPlanPath() {
             if (!currentStudentId) {
-                alert('请先注册学生信息');
+                alert('请先登录');
+                document.getElementById('authModal').style.display = 'flex';
                 return;
             }
             const subject = prompt('请输入科目：', '数据结构');
@@ -1713,6 +2020,8 @@
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
             loadSystemStats();
+            // 显示登录模态框
+            document.getElementById('authModal').style.display = 'flex';
         });
     </script>
 </body>

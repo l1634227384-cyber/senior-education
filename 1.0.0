@@ -1,0 +1,100 @@
+Looking in indexes: https://mirrors.aliyun.com/pypi/simple
+Requirement already satisfied: openai in d:\download软件\python\lib\site-packages (1.75.0)
+Collecting langgraph
+  Downloading https://mirrors.aliyun.com/pypi/packages/48/9e/31ca236104966d7bb14ea9e93cfd73350aea8c41008ddf057b65794ed10d/langgraph-1.2.4-py3-none-any.whl (245 kB)
+Collecting tiktoken
+  Downloading https://mirrors.aliyun.com/pypi/packages/42/a6/c1936d16055436cb32e6c6128d68629622e00f4768562f55653752d34768/tiktoken-0.13.0-cp313-cp313-win_amd64.whl (874 kB)
+     -------------------------------------- 874.8/874.8 kB 1.1 MB/s eta 0:00:00
+Collecting fastapi
+  Downloading https://mirrors.aliyun.com/pypi/packages/e0/82/45359b62a067409bd929ae8a56b8ed13e5a8c8a61194b3c236920999ab83/fastapi-0.136.3-py3-none-any.whl (117 kB)
+Collecting uvicorn
+  Downloading https://mirrors.aliyun.com/pypi/packages/88/fa/e1388bbcf24ef3274f45c0c1c7b501fd14971037c1b6ee23610553307497/uvicorn-0.49.0-py3-none-any.whl (71 kB)
+Collecting jinja2
+  Downloading https://mirrors.aliyun.com/pypi/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl (134 kB)
+Collecting python-multipart
+  Downloading https://mirrors.aliyun.com/pypi/packages/e1/04/e8135ebd1ad02c56ec633277529b2602ff99ff634be76cdba5744cf554fd/python_multipart-0.0.32-py3-none-any.whl (30 kB)
+Collecting websockets
+  Downloading https://mirrors.aliyun.com/pypi/packages/6b/ae/90366304d7c2ce80f9b826096a9e9048b4bb760e44d3b873bb272cba696b/websockets-16.0-cp313-cp313-win_amd64.whl (178 kB)
+Collecting sqlalchemy
+  Downloading https://mirrors.aliyun.com/pypi/packages/f6/1c/067cc6187ed32d2ec222fe6d2643acc1659a6d0659f8a7cbc5ad3ae83280/sqlalchemy-2.0.50-cp313-cp313-win_amd64.whl (2.1 MB)
+     ---------------------------------------- 2.1/2.1 MB 1.0 MB/s eta 0:00:00
+Collecting aiosqlite
+  Downloading https://mirrors.aliyun.com/pypi/packages/00/b7/e3bf5133d697a08128598c8d0abc5e16377b51465a33756de24fa7dee953/aiosqlite-0.22.1-py3-none-any.whl (17 kB)
+Collecting aiofiles
+  Downloading https://mirrors.aliyun.com/pypi/packages/bc/8a/340a1555ae33d7354dbca4faa54948d76d89a27ceef032c8c3bc661d003e/aiofiles-25.1.0-py3-none-any.whl (14 kB)
+Requirement already satisfied: httpx in d:\download软件\python\lib\site-packages (0.28.1)
+Requirement already satisfied: pydantic in d:\download软件\python\lib\site-packages (2.11.3)
+Collecting python-dotenv
+  Downloading https://mirrors.aliyun.com/pypi/packages/0b/d7/1959b9648791274998a9c3526f6d0ec8fd2233e4d4acce81bbae76b44b2a/python_dotenv-1.2.2-py3-none-any.whl (22 kB)
+Requirement already satisfied: anyio<5,>=3.5.0 in d:\download软件\python\lib\site-packages (from openai) (4.9.0)
+Requirement already satisfied: distro<2,>=1.7.0 in d:\download软件\python\lib\site-packages (from openai) (1.9.0)
+Requirement already satisfied: jiter<1,>=0.4.0 in d:\download软件\python\lib\site-packages (from openai) (0.9.0)
+Requirement already satisfied: sniffio in d:\download软件\python\lib\site-packages (from openai) (1.3.1)
+Requirement already satisfied: tqdm>4 in d:\download软件\python\lib\site-packages (from openai) (4.67.1)
+Requirement already satisfied: typing-extensions<5,>=4.11 in d:\download软件\python\lib\site-packages (from openai) (4.13.2)
+Collecting langchain-core<2,>=1.4.0 (from langgraph)
+  Downloading https://mirrors.aliyun.com/pypi/packages/d0/2c/92a6a6f5af07f1c347021d81aea307d405ed9d34a4f8ea6b78cfa3c3b189/langchain_core-1.4.2-py3-none-any.whl (550 kB)
+     ------------------------------------ 550.1/550.1 kB 718.9 kB/s eta 0:00:00
+Collecting langgraph-checkpoint<5.0.0,>=4.1.0 (from langgraph)
+  Downloading https://mirrors.aliyun.com/pypi/packages/bd/b4/71425e3e38be92611300b9cc5e46a5bf98ab23f5ea8a75b73d02a2f1413c/langgraph_checkpoint-4.1.1-py3-none-any.whl (56 kB)
+Collecting langgraph-prebuilt<1.2.0,>=1.1.0 (from langgraph)
+  Downloading https://mirrors.aliyun.com/pypi/packages/e9/43/3fe1a700b8490ed02679cdbbc8c915eb23a092faf496c9c1118abcd10be3/langgraph_prebuilt-1.1.0-py3-none-any.whl (41 kB)
+Collecting langgraph-sdk<0.5.0,>=0.4.2 (from langgraph)
+  Downloading https://mirrors.aliyun.com/pypi/packages/a0/05/aac507337cceae773c2cc9ab91eb6301963af7aeeb55b4217a00e15aff17/langgraph_sdk-0.4.2-py3-none-any.whl (160 kB)
+Collecting xxhash>=3.5.0 (from langgraph)
+  Downloading https://mirrors.aliyun.com/pypi/packages/99/57/d849a8d3afa1f8f4bc6a831cd89f49f9706fbbad94d2975d6140a171988c/xxhash-3.7.0-cp313-cp313-win_amd64.whl (31 kB)
+Collecting regex (from tiktoken)
+  Downloading https://mirrors.aliyun.com/pypi/packages/e6/1d/861a93719fb9ee7dbfc3761b3797b7a3e112a5d42c6129459d2d741be9b5/regex-2026.5.9-cp313-cp313-win_amd64.whl (277 kB)
+Requirement already satisfied: requests in d:\download软件\python\lib\site-packages (from tiktoken) (2.32.3)
+Collecting starlette>=0.46.0 (from fastapi)
+  Downloading https://mirrors.aliyun.com/pypi/packages/1c/54/196d0c1db10af76baa4f64894448505d60d3cdf70ef92cbb35f46a4e4c71/starlette-1.2.1-py3-none-any.whl (73 kB)
+Collecting typing-inspection>=0.4.2 (from fastapi)
+  Downloading https://mirrors.aliyun.com/pypi/packages/dc/9b/47798a6c91d8bdb567fe2698fe81e0c6b7cb7ef4d13da4114b41d239f65d/typing_inspection-0.4.2-py3-none-any.whl (14 kB)
+Collecting annotated-doc>=0.0.2 (from fastapi)
+  Downloading https://mirrors.aliyun.com/pypi/packages/1e/d3/26bf1008eb3d2daa8ef4cacc7f3bfdc11818d111f7e2d0201bc6e3b49d45/annotated_doc-0.0.4-py3-none-any.whl (5.3 kB)
+Collecting click>=7.0 (from uvicorn)
+  Downloading https://mirrors.aliyun.com/pypi/packages/c7/0d/67e5b4109ea4a837e80daa87c2c696711955e40449a97e8926672534def2/click-8.4.1-py3-none-any.whl (116 kB)
+Requirement already satisfied: h11>=0.8 in d:\download软件\python\lib\site-packages (from uvicorn) (0.14.0)
+Collecting MarkupSafe>=2.0 (from jinja2)
+  Downloading https://mirrors.aliyun.com/pypi/packages/05/73/c4abe620b841b6b791f2edc248f556900667a5a1cf023a6646967ae98335/markupsafe-3.0.3-cp313-cp313-win_amd64.whl (15 kB)
+Collecting greenlet>=1 (from sqlalchemy)
+  Downloading https://mirrors.aliyun.com/pypi/packages/37/f7/129f27ca700845b8ee8ca88ce7f43435a1239c2eddb7677fc938822762cf/greenlet-3.5.1-cp313-cp313-win_amd64.whl (238 kB)
+Requirement already satisfied: certifi in d:\download软件\python\lib\site-packages (from httpx) (2025.1.31)
+Requirement already satisfied: httpcore==1.* in d:\download软件\python\lib\site-packages (from httpx) (1.0.8)
+Requirement already satisfied: idna in d:\download软件\python\lib\site-packages (from httpx) (3.10)
+Requirement already satisfied: annotated-types>=0.6.0 in d:\download软件\python\lib\site-packages (from pydantic) (0.7.0)
+Requirement already satisfied: pydantic-core==2.33.1 in d:\download软件\python\lib\site-packages (from pydantic) (2.33.1)
+Requirement already satisfied: colorama in d:\download软件\python\lib\site-packages (from click>=7.0->uvicorn) (0.4.6)
+Collecting jsonpatch<2.0.0,>=1.33.0 (from langchain-core<2,>=1.4.0->langgraph)
+  Downloading https://mirrors.aliyun.com/pypi/packages/73/07/02e16ed01e04a374e644b575638ec7987ae846d25ad97bcc9945a3ee4b0e/jsonpatch-1.33-py2.py3-none-any.whl (12 kB)
+Collecting langchain-protocol>=0.0.14 (from langchain-core<2,>=1.4.0->langgraph)
+  Downloading https://mirrors.aliyun.com/pypi/packages/1f/9c/06dfcc88d02a6364e8d864c421ddd3736305cb0a6c853f75c302c80fe17c/langchain_protocol-0.0.16-py3-none-any.whl (7.0 kB)
+Collecting langsmith<1.0.0,>=0.3.45 (from langchain-core<2,>=1.4.0->langgraph)
+  Downloading https://mirrors.aliyun.com/pypi/packages/b4/65/f9c9dc19b21a9076286fafdb0ab732c9019ddf71aa7e7d720a830a98fe2a/langsmith-0.8.11-py3-none-any.whl (478 kB)
+Requirement already satisfied: packaging>=23.2.0 in d:\download软件\python\lib\site-packages (from langchain-core<2,>=1.4.0->langgraph) (25.0)
+Collecting pyyaml<7.0.0,>=5.3.0 (from langchain-core<2,>=1.4.0->langgraph)
+  Downloading https://mirrors.aliyun.com/pypi/packages/97/c9/39d5b874e8b28845e4ec2202b5da735d0199dbe5b8fb85f91398814a9a46/pyyaml-6.0.3-cp313-cp313-win_amd64.whl (154 kB)
+Collecting tenacity!=8.4.0,<10.0.0,>=8.1.0 (from langchain-core<2,>=1.4.0->langgraph)
+  Downloading https://mirrors.aliyun.com/pypi/packages/d7/c1/eb8f9debc45d3b7918a32ab756658a0904732f75e555402972246b0b8e71/tenacity-9.1.4-py3-none-any.whl (28 kB)
+Collecting uuid-utils<1.0,>=0.12.0 (from langchain-core<2,>=1.4.0->langgraph)
+  Downloading https://mirrors.aliyun.com/pypi/packages/74/99/617ceb9e3a95b23837012740979baf71afad723b70daf34862da3f7c17a1/uuid_utils-0.16.0-cp313-cp313-win_amd64.whl (174 kB)
+Collecting ormsgpack>=1.12.0 (from langgraph-checkpoint<5.0.0,>=4.1.0->langgraph)
+  Downloading https://mirrors.aliyun.com/pypi/packages/7b/e8/0fb45f57a2ada1fed374f7494c8cd55e2f88ccd0ab0a669aa3468716bf5f/ormsgpack-1.12.2-cp313-cp313-win_amd64.whl (117 kB)
+Collecting orjson>=3.11.5 (from langgraph-sdk<0.5.0,>=0.4.2->langgraph)
+  Downloading https://mirrors.aliyun.com/pypi/packages/67/bd/2775ff28bfe883b9aa1ff348300542eb2ef1ee18d8ae0e3a49846817a865/orjson-3.11.9-cp313-cp313-win_amd64.whl (127 kB)
+Collecting websockets
+  Downloading https://mirrors.aliyun.com/pypi/packages/1b/6c/c65773d6cab416a64d191d6ee8a8b1c68a09970ea6909d16965d26bfed1e/websockets-15.0.1-cp313-cp313-win_amd64.whl (176 kB)
+Requirement already satisfied: charset-normalizer<4,>=2 in d:\download软件\python\lib\site-packages (from requests->tiktoken) (3.4.1)
+Requirement already satisfied: urllib3<3,>=1.21.1 in d:\download软件\python\lib\site-packages (from requests->tiktoken) (2.4.0)
+Collecting jsonpointer>=1.9 (from jsonpatch<2.0.0,>=1.33.0->langchain-core<2,>=1.4.0->langgraph)
+  Downloading https://mirrors.aliyun.com/pypi/packages/9e/6a/a83720e953b1682d2d109d3c2dbb0bc9bf28cc1cbc205be4ef4be5da709d/jsonpointer-3.1.1-py3-none-any.whl (7.7 kB)
+Collecting requests-toolbelt>=1.0.0 (from langsmith<1.0.0,>=0.3.45->langchain-core<2,>=1.4.0->langgraph)
+  Downloading https://mirrors.aliyun.com/pypi/packages/3f/51/d4db610ef29373b879047326cbf6fa98b6c1969d6f6dc423279de2b1be2c/requests_toolbelt-1.0.0-py2.py3-none-any.whl (54 kB)
+Collecting zstandard>=0.23.0 (from langsmith<1.0.0,>=0.3.45->langchain-core<2,>=1.4.0->langgraph)
+  Downloading https://mirrors.aliyun.com/pypi/packages/d9/82/b9c06c870f3bd8767c201f1edbdf9e8dc34be5b0fbc5682c4f80fe948475/zstandard-0.25.0-cp313-cp313-win_amd64.whl (506 kB)
+Installing collected packages: zstandard, xxhash, websockets, uuid-utils, typing-inspection, tenacity, regex, pyyaml, python-multipart, python-dotenv, ormsgpack, orjson, MarkupSafe, langchain-protocol, jsonpointer, greenlet, click, annotated-doc, aiosqlite, aiofiles, uvicorn, tiktoken, starlette, sqlalchemy, requests-toolbelt, jsonpatch, jinja2, langsmith, fastapi, langchain-core, langgraph-sdk, langgraph-checkpoint, langgraph-prebuilt, langgraph
+  Attempting uninstall: typing-inspection
+    Found existing installation: typing-inspection 0.4.0
+    Uninstalling typing-inspection-0.4.0:
+      Successfully uninstalled typing-inspection-0.4.0
+Successfully installed MarkupSafe-3.0.3 aiofiles-25.1.0 aiosqlite-0.22.1 annotated-doc-0.0.4 click-8.4.1 fastapi-0.136.3 greenlet-3.5.1 jinja2-3.1.6 jsonpatch-1.33 jsonpointer-3.1.1 langchain-core-1.4.2 langchain-protocol-0.0.16 langgraph-1.2.4 langgraph-checkpoint-4.1.1 langgraph-prebuilt-1.1.0 langgraph-sdk-0.4.2 langsmith-0.8.11 orjson-3.11.9 ormsgpack-1.12.2 python-dotenv-1.2.2 python-multipart-0.0.32 pyyaml-6.0.3 regex-2026.5.9 requests-toolbelt-1.0.0 sqlalchemy-2.0.50 starlette-1.2.1 tenacity-9.1.4 tiktoken-0.13.0 typing-inspection-0.4.2 uuid-utils-0.16.0 uvicorn-0.49.0 websockets-15.0.1 xxhash-3.7.0 zstandard-0.25.0
