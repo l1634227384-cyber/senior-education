@@ -95,6 +95,18 @@ class ResourceFeedbackRequest(BaseModel):
     feedback_text: Optional[str] = None
 
 
+class ExerciseGradeRequest(BaseModel):
+    """习题批阅请求"""
+    resource_id: str
+    answers: Dict[str, str]  # {question_id: student_answer}
+
+
+class ChatIntentRequest(BaseModel):
+    """对话意图识别请求"""
+    student_id: str
+    message: str
+
+
 # ==================== 工具函数 ====================
 
 async def _get_student(db: AsyncSession, student_id: str) -> Student:
@@ -179,17 +191,15 @@ async def index(request: Request):
 
 
 # ==================== 学生信息 ====================
-@app.post("/api/students")
-async def create_student(request: StudentCreateRequest, db: AsyncSession = Depends(get_db)):
-    """创建学生"""
-    # 检查是否已存在
+@app.post("/api/students/register")
+async def register_student(request: StudentCreateRequest, db: AsyncSession = Depends(get_db)):
+    """注册新学生（学号必须不存在）"""
     existing = await db.execute(
         select(Student).where(Student.student_id == request.student_id)
     )
     student = existing.scalar_one_or_none()
     if student:
-        # 已存在则直接返回
-        return {"status": "success", "student": student_to_dict(student)}
+        raise HTTPException(status_code=400, detail="该学号已注册，请直接登录")
 
     student = Student(
         student_id=request.student_id,
@@ -206,6 +216,34 @@ async def create_student(request: StudentCreateRequest, db: AsyncSession = Depen
     await _get_or_create_profile(db, student.id)
 
     return {"status": "success", "student": student_to_dict(student)}
+
+
+class StudentLoginRequest(BaseModel):
+    """登录请求"""
+    student_id: str
+    name: str
+
+
+@app.post("/api/students/login")
+async def login_student(request: StudentLoginRequest, db: AsyncSession = Depends(get_db)):
+    """学生登录（验证学号和姓名）"""
+    result = await db.execute(
+        select(Student).where(Student.student_id == request.student_id)
+    )
+    student = result.scalar_one_or_none()
+    if not student:
+        raise HTTPException(status_code=404, detail="学号不存在，请先注册")
+    if student.name != request.name:
+        raise HTTPException(status_code=403, detail="姓名与学号不匹配")
+
+    return {"status": "success", "student": student_to_dict(student)}
+
+
+# 保留旧接口兼容
+@app.post("/api/students")
+async def create_student(request: StudentCreateRequest, db: AsyncSession = Depends(get_db)):
+    """创建学生（兼容旧接口）"""
+    return await register_student(request, db)
 
 @app.get("/api/students/{student_id}")
 async def get_student(student_id: str, db: AsyncSession = Depends(get_db)):
@@ -501,6 +539,151 @@ async def submit_resource_feedback(request: ResourceFeedbackRequest, db: AsyncSe
     await db.commit()
 
     return {"status": "success", "message": "反馈已提交"}
+
+
+@app.post("/api/resources/{resource_id}/grade")
+async def grade_exercise(resource_id: str, request: ExerciseGradeRequest, db: AsyncSession = Depends(get_db)):
+    """习题一键批阅"""
+    result = await db.execute(
+        select(LearningResource).where(LearningResource.id == resource_id)
+    )
+    resource = result.scalar_one_or_none()
+    if not resource:
+        raise HTTPException(status_code=404, detail="资源不存在")
+    if resource.resource_type != "exercise":
+        raise HTTPException(status_code=400, detail="该资源不是习题")
+
+    metadata = resource.extra_data or {}
+    if not metadata or "questions" not in metadata:
+        raise HTTPException(status_code=400, detail="习题数据不完整")
+
+    # 调用 ExerciseAgent 的批阅功能
+    from agents import ExerciseAgent
+    agent = ExerciseAgent()
+    grade_result = await agent.grade_exercise(metadata, request.answers)
+
+    return {
+        "status": "success",
+        "resource_id": resource_id,
+        "grading_result": grade_result
+    }
+
+
+@app.post("/api/chat/intent")
+async def detect_chat_intent(request: ChatIntentRequest, db: AsyncSession = Depends(get_db)):
+    """检测对话意图，判断是否触发资源生成"""
+    student = await _get_student(db, request.student_id)
+    profile = await _get_or_create_profile(db, student.id)
+    profile_dict = profile_to_dict(profile)
+
+    message = request.message.strip()
+
+    # 简单规则匹配 + LLM 意图识别
+    import re
+
+    # 1. 直接匹配资源生成请求
+    gen_patterns = [
+        r'(?:给我|我要|帮我|请给我|生成|创建|制作).{0,10}(?:学习资料|课件|讲义|练习题|思维导图|资料)',
+        r'(?:学|学习|复习|预习).{0,5}(?:资料|资源|课件|讲义)',
+        r'(?:需要|想要).{0,5}(?:资料|资源|课件|讲义|练习)',
+    ]
+    for pattern in gen_patterns:
+        if re.search(pattern, message):
+            # 尝试提取科目和主题
+            subject_topic = _extract_subject_topic(message)
+            if subject_topic:
+                return {
+                    "intent": "generate_resources",
+                    "subject": subject_topic[0],
+                    "topic": subject_topic[1],
+                    "confidence": 0.9,
+                    "message": "检测到学习资料生成请求"
+                }
+
+    # 2. 使用 LLM 进行意图识别
+    intent_prompt = """分析以下学生消息，判断其意图：
+
+学生消息：""" + message + """
+
+请判断意图类型（返回JSON）：
+{
+    "intent": "generate_resources|profile_building|tutoring|general",
+    "subject": "如果意图是生成资源，提取科目",
+    "topic": "如果意图是生成资源，提取主题",
+    "confidence": 0.0-1.0,
+    "reasoning": "判断理由"
+}
+
+意图说明：
+- generate_resources: 学生明确要求学习资料、课件、讲义、练习题等
+- profile_building: 学生描述自己的学习情况、兴趣、目标等
+- tutoring: 学生提问具体知识点问题
+- general: 其他一般性对话"""
+
+    from agents import LLMClient
+    llm = LLMClient()
+    intent_result = await llm.chat_json([
+        {"role": "system", "content": "你是一个对话意图识别助手。"},
+        {"role": "user", "content": intent_prompt}
+    ], temperature=0.3)
+
+    intent = intent_result.get("intent", "general")
+    confidence = intent_result.get("confidence", 0.5)
+
+    if intent == "generate_resources" and confidence >= 0.7:
+        subject = intent_result.get("subject", "")
+        topic = intent_result.get("topic", "")
+        if not subject or not topic:
+            subject_topic = _extract_subject_topic(message)
+            if subject_topic:
+                subject, topic = subject_topic
+        return {
+            "intent": "generate_resources",
+            "subject": subject,
+            "topic": topic,
+            "confidence": confidence,
+            "message": "AI识别到学习资料生成意图"
+        }
+
+    return {
+        "intent": intent,
+        "confidence": confidence,
+        "message": intent_result.get("reasoning", "")
+    }
+
+
+def _extract_subject_topic(message: str) -> Optional[tuple]:
+    """从消息中提取科目和主题"""
+    import re
+
+    # 常见模式："给我XXX的YYY资料" -> subject=XXX, topic=YYY
+    patterns = [
+        r'(?:给我|我要|帮我|生成|创建|制作)\s*(\S+?)\s*的\s*(\S+?)\s*(?:资料|资源|课件|讲义|练习|学习)',
+        r'(?:学|学习|复习|预习)\s*(\S+?)\s*的\s*(\S+)',
+        r'(\S+?)\s*的\s*(\S+?)\s*(?:资料|资源|课件|讲义|练习)',
+        r'(?:生成|创建|制作)\s*(\S+?)\s+(\S+?)\s*(?:资料|资源|课件|讲义|练习)',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, message)
+        if match:
+            return (match.group(1), match.group(2))
+
+    # 尝试匹配 "给我回溯法的学习资料" 这种格式
+    simple = re.search(r'(?:给我|我要|帮我|生成)\s*(\S+?)\s*(?:的)?\s*(?:学习资料|资料|课件|讲义)', message)
+    if simple:
+        topic = simple.group(1)
+        # 尝试推断科目
+        subject_map = {
+            "回溯法": "算法设计与分析", "动态规划": "算法设计与分析", "贪心": "算法设计与分析",
+            "二叉树": "数据结构", "链表": "数据结构", "图": "数据结构",
+            "微积分": "高等数学", "线性代数": "高等数学", "概率论": "高等数学",
+            "Python": "程序设计", "Java": "程序设计", "C++": "程序设计",
+        }
+        subject = subject_map.get(topic, "计算机科学")
+        return (subject, topic)
+
+    return None
 
 
 # ==================== 学习路径 ====================
@@ -857,7 +1040,13 @@ async def websocket_chat(websocket: WebSocket, student_id: str):
                         await db.commit()
 
                     extracted = result.get("extracted_features", {})
-                    response = f"已更新你的学习画像！{extracted.get('profile_summary', '请继续告诉我更多信息。')}"
+                    summary = extracted.get('profile_summary', '请继续告诉我更多信息。')
+                    # 将可能包含的 HTML 标签清理为纯文本/Markdown
+                    import re
+                    summary = re.sub(r'<strong>(.*?)</strong>', r'**\1**', summary, flags=re.IGNORECASE)
+                    summary = re.sub(r'<br\s*/?>', '\n', summary, flags=re.IGNORECASE)
+                    summary = re.sub(r'<[^>]+>', '', summary)
+                    response = f"已更新你的学习画像！{summary}"
 
                 elif chat_type == "tutor":
                     messages.append({

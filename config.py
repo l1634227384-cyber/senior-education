@@ -35,7 +35,7 @@ class Settings:
     # 数据库配置
     DATABASE_URL: str = os.getenv(
     "DATABASE_URL",
-    "mysql+aiomysql://admin:admin123@10.82.226.119:3306/edu_agent"
+    "mysql+aiomysql://admin:admin123@10.78.202.91:3306/edu_agent"
     )
 
     # 文件存储
@@ -65,9 +65,9 @@ class Settings:
     AGENT_TYPES: list = [
         "profile_agent",        # 画像构建智能体
         "content_agent",        # 内容生成智能体
-        "exercise_agent",       # 习题生成智能体
+        "exercise_agent",       # 习题生成智能体（含自动批阅）
         "mindmap_agent",        # 思维导图智能体
-        "video_agent",          # 视频/动画智能体
+        "ppt_slides_agent",     # 课件讲义智能体
         "code_agent",           # 代码实操智能体
         "reading_agent",        # 拓展阅读智能体
         "path_agent",           # 路径规划智能体
@@ -82,10 +82,9 @@ class Settings:
         "mind_map",             # 思维导图
         "exercise",             # 练习题
         "reading_material",     # 拓展阅读
-        "video_animation",      # 视频/动画
+        "ppt_slides",           # 课件讲义
         "code_practice",        # 代码实操案例
         "project_case",         # 实践项目
-        "ppt_slides",           # PPT课件
     ]
 
     def __init__(self):

@@ -382,25 +382,65 @@
             background: var(--bg-card);
             border-radius: var(--radius);
             padding: 24px;
-            max-width: 700px;
-            max-height: 80vh;
+            width: 700px;
+            max-width: 90vw;
+            height: 80vh;
+            max-height: 90vh;
             overflow-y: auto;
             box-shadow: var(--shadow-lg);
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
         }
-        .modal h2 { margin-bottom: 16px; }
+        .modal.fullscreen {
+            width: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            max-height: 100vh;
+            border-radius: 0;
+        }
+        .modal .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-shrink: 0;
+        }
+        .modal h2 { margin: 0; font-size: 18px; }
         .modal .content-body {
             font-size: 14px;
             line-height: 1.8;
             white-space: pre-wrap;
             word-break: break-word;
+            overflow-y: auto;
+            flex: 1;
         }
         .modal .close-btn {
-            float: right;
             background: none;
             border: none;
             font-size: 24px;
             cursor: pointer;
             color: var(--text-light);
+            padding: 0 4px;
+        }
+        .modal .close-btn:hover { color: var(--text); }
+        .modal .modal-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .modal .modal-actions button {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text-light);
+        }
+        .modal .modal-actions button:hover {
+            background: var(--bg);
+            color: var(--text);
         }
 
         /* 加载动画 */
@@ -493,7 +533,10 @@
                     <input type="text" id="studentName" placeholder="姓名" value="张同学">
                     <input type="text" id="studentMajor" placeholder="专业" value="计算机科学与技术">
                     <input type="text" id="studentGrade" placeholder="年级" value="大三">
-                    <button class="btn btn-primary" onclick="registerStudent()">注册/登录</button>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-primary" style="flex:1;" onclick="registerStudent()">注册</button>
+                        <button class="btn btn-secondary" style="flex:1;" onclick="loginStudent()">登录</button>
+                    </div>
                 </div>
                 <div id="profileDisplay" class="profile-card" style="display:none;">
                     <div style="font-weight:600;margin-bottom:8px;">📋 学习画像</div>
@@ -588,9 +631,14 @@
 
     <!-- 资源详情模态框 -->
     <div class="modal-overlay" id="resourceModal" style="display:none;" onclick="closeModal(event)">
-        <div class="modal" onclick="event.stopPropagation()">
-            <button class="close-btn" onclick="document.getElementById('resourceModal').style.display='none'">&times;</button>
-            <div id="modalContent"></div>
+        <div class="modal" id="resourceModalBox" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-actions">
+                    <button onclick="toggleModalSize()" title="切换全屏/半屏">⛶ 全屏</button>
+                    <button onclick="document.getElementById('resourceModal').style.display='none'" title="关闭">&times;</button>
+                </div>
+            </div>
+            <div id="modalContent" class="content-body"></div>
         </div>
     </div>
 
@@ -654,24 +702,75 @@
 
             showLoading('注册中...');
             try {
-                const resp = await fetch('/api/students', {
+                const resp = await fetch('/api/students/register', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({student_id: studentId, name, major, grade})
                 });
                 const data = await resp.json();
-                
+                if (!resp.ok) {
+                    alert('❌ ' + (data.detail || '注册失败'));
+                    return;
+                }
+
                 currentStudentId = studentId;
                 alert(`✅ 学生 ${name} 注册成功！现在可以开始对话构建画像了。`);
-                
+
                 // 建立 WebSocket 连接
                 connectWebSocket(studentId);
 
-                // 加载画像
+                // 加载画像和历史资源
                 await loadProfile();
+                await loadStudentResources();
                 await loadSystemStats();
             } catch (err) {
                 alert('注册失败: ' + err.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 登录学生
+        async function loginStudent() {
+            const studentId = document.getElementById('studentId').value.trim();
+            const name = document.getElementById('studentName').value.trim();
+
+            if (!studentId || !name) {
+                alert('请填写学号和姓名');
+                return;
+            }
+
+            showLoading('登录中...');
+            try {
+                const resp = await fetch('/api/students/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({student_id: studentId, name})
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    alert('❌ ' + (data.detail || '登录失败'));
+                    return;
+                }
+
+                currentStudentId = studentId;
+                // 填充用户信息
+                if (data.student) {
+                    document.getElementById('studentName').value = data.student.name || '';
+                    document.getElementById('studentMajor').value = data.student.major || '';
+                    document.getElementById('studentGrade').value = data.student.grade || '';
+                }
+                alert(`✅ 欢迎回来，${data.student.name}！`);
+
+                // 建立 WebSocket 连接
+                connectWebSocket(studentId);
+
+                // 加载画像和历史资源
+                await loadProfile();
+                await loadStudentResources();
+                await loadSystemStats();
+            } catch (err) {
+                alert('登录失败: ' + err.message);
             } finally {
                 hideLoading();
             }
@@ -690,51 +789,99 @@
             }
         }
 
+        // 认知风格中文映射
+        function getCognitiveStyleLabel(cs) {
+            if (!cs || !cs.type || cs.type === 'unknown') {
+                // 尝试根据分数推断
+                const v = cs?.visual_score || 0;
+                const ve = cs?.verbal_score || 0;
+                const a = cs?.active_score || 0;
+                const r = cs?.reflective_score || 0;
+                if (v > ve && a > r) return '视觉-主动型';
+                if (v > ve && r >= a) return '视觉-反思型';
+                if (ve >= v && a > r) return '言语-主动型';
+                if (ve >= v && r >= a) return '言语-反思型';
+                return '待推断（多聊聊学习习惯即可识别）';
+            }
+            const map = {
+                'visual': '视觉型',
+                'verbal': '言语型',
+                'mixed': '混合型',
+                'active': '主动型',
+                'reflective': '反思型'
+            };
+            return map[cs.type] || cs.type;
+        }
+
         // 渲染画像
         function renderProfile(profile) {
             const display = document.getElementById('profileDisplay');
             const dims = document.getElementById('profileDimensions');
-            
+
             if (!profile || Object.keys(profile).length === 0) {
                 display.style.display = 'none';
                 return;
             }
-            
+
             display.style.display = 'block';
-            
+
             const kb = profile.knowledge_base || {};
             const cs = profile.cognitive_style || {};
             const lp = profile.learning_preference || {};
-            
+            const habits = profile.learning_habits || {};
+            const pace = profile.learning_pace || {};
+            const interests = profile.subject_interests || {};
+
             let html = '';
-            
+
             // 知识基础
-            if (Object.keys(kb).length > 0) {
-                html += '<div style="margin-bottom:8px;font-weight:500;font-size:12px;color:var(--text-light);">知识基础</div>';
-                for (const [subject, score] of Object.entries(kb)) {
+            const kbEntries = Object.entries(kb).filter(([k]) => !k.startsWith('_'));
+            if (kbEntries.length > 0) {
+                html += '<div style="margin-bottom:8px;font-weight:500;font-size:12px;color:var(--text-light);">📚 知识基础</div>';
+                for (const [subject, score] of kbEntries) {
+                    const s = typeof score === 'number' ? score : 0;
                     html += `<div class="dimension">
                         <span>${subject}</span>
-                        <div class="dim-bar"><div class="dim-fill" style="width:${score}%"></div></div>
-                        <span>${score}</span>
+                        <div class="dim-bar"><div class="dim-fill" style="width:${Math.min(s,100)}%"></div></div>
+                        <span>${s}</span>
                     </div>`;
                 }
             }
-            
-            // 认知风格
-            if (cs.type) {
-                html += `<div style="margin:8px 0;font-weight:500;font-size:12px;color:var(--text-light);">认知风格: ${cs.type}</div>`;
-            }
-            
+
+            // 认知风格（增强展示）
+            const styleLabel = getCognitiveStyleLabel(cs);
+            html += `<div style="margin:10px 0;padding:8px;background:rgba(79,70,229,0.08);border-radius:6px;">
+                <div style="font-weight:500;font-size:12px;color:var(--text-light);">🧠 认知风格</div>
+                <div style="font-size:14px;font-weight:600;color:var(--primary);margin-top:4px;">${styleLabel}</div>
+                ${cs.visual_score ? `<div style="font-size:11px;color:var(--text-light);margin-top:4px;">
+                    视觉:${cs.visual_score} | 言语:${cs.verbal_score} | 主动:${cs.active_score} | 反思:${cs.reflective_score}
+                </div>` : ''}
+            </div>`;
+
             // 学习偏好
-            if (lp.preferred_formats) {
-                html += `<div style="margin:8px 0;font-size:12px;">偏好: ${lp.preferred_formats?.join(', ') || '未设置'}</div>`;
+            if (lp.preferred_formats && lp.preferred_formats.length > 0) {
+                const formatLabels = { 'text': '文本', 'video': '视频', 'code': '代码', 'interactive': '互动', 'audio': '音频' };
+                const labels = lp.preferred_formats.map(f => formatLabels[f] || f).join('、');
+                html += `<div style="margin:8px 0;font-size:12px;">🎯 偏好格式: ${labels}</div>`;
             }
-            
+
+            // 学习节奏
+            if (pace.speed && pace.speed !== 'moderate') {
+                const speedMap = { 'fast': '较快', 'slow': '较慢', 'moderate': '适中' };
+                html += `<div style="margin:8px 0;font-size:12px;">⏱️ 学习节奏: ${speedMap[pace.speed] || pace.speed}</div>`;
+            }
+
+            // 学科兴趣
+            const primary = interests.primary || [];
+            if (primary.length > 0) {
+                html += `<div style="margin:8px 0;font-size:12px;">⭐ 兴趣领域: ${primary.join('、')}</div>`;
+            }
+
             // 画像摘要
-            if (profile.profile_summary) {
-                html += `<div style="margin-top:8px;font-size:12px;color:var(--text-light);">${profile.profile_summary?.substring(0, 100)}...</div>`;
+            if (profile.profile_summary && profile.profile_summary !== '新学生，画像待构建') {
+                html += `<div style="margin-top:10px;font-size:12px;color:var(--text-light);line-height:1.6;">${profile.profile_summary.substring(0, 120)}...</div>`;
             }
-            
+
             dims.innerHTML = html || '<div style="font-size:12px;">画像构建中，请继续对话...</div>';
         }
 
@@ -749,6 +896,19 @@
                 `;
             } catch (err) {
                 document.getElementById('systemStats').textContent = '统计加载失败';
+            }
+        }
+
+        // 加载学生历史资源
+        async function loadStudentResources() {
+            if (!currentStudentId) return;
+            try {
+                const resp = await fetch(`/api/students/${currentStudentId}/resources`);
+                const data = await resp.json();
+                allResources = data.resources || [];
+                renderResources();
+            } catch (err) {
+                console.log('历史资源加载失败:', err);
             }
         }
 
@@ -813,13 +973,32 @@
             addChatMessage('user', message);
             input.value = '';
 
-            // 检测是否是资源生成请求（保持原有 HTTP 方式）
-            const genMatch = message.match(/生成\s*(.+?)\s*(.+?)\s*的?\s*(学习资料|资源|课程)/);
+            // 检测是否是资源生成请求（增强版意图识别）
+            const genMatch = message.match(/生成\s*(.+?)\s*(.+?)\s*的?\s*(学习资料|资源|课程|课件|讲义|练习)/);
             if (genMatch) {
                 showLoading('正在生成全部学习资源...');
                 await generateResources(genMatch[1].trim(), genMatch[2].trim());
                 hideLoading();
                 return;
+            }
+
+            // 调用意图识别API，自动检测学习资料需求
+            try {
+                const intentResp = await fetch('/api/chat/intent', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({student_id: currentStudentId, message: message})
+                });
+                const intentData = await intentResp.json();
+                if (intentData.intent === 'generate_resources' && intentData.subject && intentData.topic) {
+                    showLoading('正在为你生成学习资料...');
+                    await generateResources(intentData.subject, intentData.topic);
+                    hideLoading();
+                    return;
+                }
+            } catch (e) {
+                // 意图识别失败不影响正常对话
+                console.log('意图识别失败:', e);
             }
 
             showLoading('智能体思考中...');
@@ -860,12 +1039,26 @@
             return div.innerHTML;
         }
 
+        // 清理后端混入的 HTML 标签，转为纯文本或 Markdown
+        function stripHtmlTags(text) {
+            if (!text) return '';
+            return text
+                .replace(/<strong>(.*?)<\/strong>/gi, '**$1**')
+                .replace(/<em>(.*?)<\/em>/gi, '*$1*')
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<p>(.*?)<\/p>/gi, '$1\n')
+                .replace(/<li>(.*?)<\/li>/gi, '- $1')
+                .replace(/<[^>]+>/g, '');
+        }
+
         // 格式化内容（安全 Markdown 渲染）
         function formatContent(text) {
             if (!text) return '';
+            // 先把后端混入的 HTML 标签清理为 Markdown/纯文本
+            let processed = stripHtmlTags(text);
             // 先提取代码块，避免被 HTML 转义
             const codeBlocks = [];
-            let processed = text.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+            processed = processed.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
                 const idx = codeBlocks.length;
                 codeBlocks.push(`<pre><code>${escapeHtml(code)}</code></pre>`);
                 return `%%CODEBLOCK_${idx}%%`;
@@ -895,7 +1088,7 @@
         // 生成资源
         async function generateResources(subject, topic) {
             addChatMessage('assistant', `正在为你生成「${subject} - ${topic}」的个性化学习资源，请稍候...`);
-            
+
             const resp = await fetch('/api/resources/generate', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -905,22 +1098,25 @@
                     topic: topic
                 })
             });
-            
+
             const data = await resp.json();
-            allResources = data.resources || [];
+            const newResources = data.resources || [];
             learningPath = data.learning_path;
-            
+
+            // 追加到已有资源列表，而不是覆盖
+            allResources = [...allResources, ...newResources];
+
             // 更新资源视图
             renderResources();
-            
+
             // 更新路径视图
             if (learningPath) {
                 renderLearningPath();
             }
-            
-            const resourceList = allResources.map(r => `- ${getTypeEmoji(r.type)} ${r.title}`).join('<br>');
-            addChatMessage('assistant', `✅ 已为你生成 <strong>${allResources.length}</strong> 个个性化学习资源：<br><br>${resourceList}<br><br>📋 学习路径已规划完成，请查看「学习路径」标签。`);
-            
+
+            const resourceList = newResources.map(r => `- ${getTypeEmoji(r.type)} ${r.title}`).join('\n');
+            addChatMessage('assistant', `✅ 已为你生成 **${newResources.length}** 个个性化学习资源：\n\n${resourceList}\n\n📋 学习路径已规划完成，请查看「学习路径」标签。`);
+
             // 自动切换到资源视图
             switchTab('resources');
         }
@@ -929,7 +1125,7 @@
         function getTypeEmoji(type) {
             const map = {
                 'lecture_doc': '📄', 'mind_map': '🧠', 'exercise': '✏️',
-                'reading_material': '📖', 'video_animation': '🎬', 'code_practice': '💻',
+                'reading_material': '📖', 'code_practice': '💻',
                 'project_case': '🔬', 'ppt_slides': '📊'
             };
             return map[type] || '📦';
@@ -939,8 +1135,8 @@
         function getTypeName(type) {
             const map = {
                 'lecture_doc': '课程讲解', 'mind_map': '思维导图', 'exercise': '练习题',
-                'reading_material': '拓展阅读', 'video_animation': '教学视频', 'code_practice': '代码实操',
-                'project_case': '实践项目', 'ppt_slides': 'PPT课件'
+                'reading_material': '拓展阅读', 'code_practice': '代码实操',
+                'project_case': '实践项目', 'ppt_slides': '课件讲义'
             };
             return map[type] || type;
         }
@@ -948,7 +1144,7 @@
         // 渲染资源
         function renderResources() {
             const container = document.getElementById('resourcesView');
-            
+
             if (allResources.length === 0) {
                 container.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-light);">
                     <div style="font-size:48px;">📚</div>
@@ -956,19 +1152,54 @@
                 </div>`;
                 return;
             }
-            
-            container.innerHTML = allResources.map(r => `
-                <div class="resource-card" onclick="viewResource('${r.id}')">
-                    <div class="type-icon">${getTypeEmoji(r.type)}</div>
-                    <div class="title">${r.title}</div>
-                    <div class="meta">
-                        <span class="badge">${getTypeName(r.type)}</span>
-                        <span class="badge">${r.difficulty || '中等'}</span>
-                        <span class="badge">${r.generated_by || 'AI生成'}</span>
+
+            // 按科目-主题分组
+            const groups = {};
+            allResources.forEach(r => {
+                const key = `${r.subject || '未分类'} · ${r.topic || '未分类'}`;
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(r);
+            });
+
+            let html = '';
+            for (const [groupKey, resources] of Object.entries(groups)) {
+                html += `<div style="grid-column:1/-1;margin:8px 0 4px;">
+                    <div style="font-size:13px;font-weight:600;color:var(--text-light);padding:4px 8px;background:var(--bg);border-radius:6px;display:inline-block;">
+                        📁 ${groupKey}
                     </div>
-                    <div class="meta" style="margin-top:8px;">${r.subject} · ${r.topic}</div>
-                </div>
-            `).join('');
+                </div>`;
+                html += resources.map(r => `
+                    <div class="resource-card" onclick="viewResource('${r.id}')">
+                        <div class="type-icon">${getTypeEmoji(r.type)}</div>
+                        <div class="title">${r.title}</div>
+                        <div class="meta">
+                            <span class="badge">${getTypeName(r.type)}</span>
+                            <span class="badge">${r.difficulty || '中等'}</span>
+                            <span class="badge">${r.generated_by || 'AI生成'}</span>
+                        </div>
+                        <div class="meta" style="margin-top:8px;font-size:11px;color:var(--text-light);">
+                            ${r.created_at ? new Date(r.created_at).toLocaleString('zh-CN') : ''}
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            container.innerHTML = html;
+        }
+
+        // 模态框全屏切换
+        let isModalFullscreen = false;
+        function toggleModalSize() {
+            const modalBox = document.getElementById('resourceModalBox');
+            const btn = modalBox.querySelector('.modal-actions button');
+            isModalFullscreen = !isModalFullscreen;
+            if (isModalFullscreen) {
+                modalBox.classList.add('fullscreen');
+                btn.textContent = '⛶ 半屏';
+            } else {
+                modalBox.classList.remove('fullscreen');
+                btn.textContent = '⛶ 全屏';
+            }
         }
 
         // 查看资源
@@ -977,43 +1208,53 @@
             try {
                 const resp = await fetch(`/api/resources/${resourceId}`);
                 const resource = await resp.json();
-                
+
                 const modal = document.getElementById('resourceModal');
                 const content = document.getElementById('modalContent');
-                
+
+                // 重置为半屏
+                isModalFullscreen = false;
+                document.getElementById('resourceModalBox').classList.remove('fullscreen');
+                document.querySelector('#resourceModalBox .modal-actions button').textContent = '⛶ 全屏';
+
                 let bodyContent = '';
+                let exportButton = '';
                 if (resource.format === 'json' && resource.metadata) {
-                    // JSON格式的资源
                     if (resource.type === 'exercise') {
-                        bodyContent = renderExerciseContent(resource.metadata);
+                        bodyContent = renderExerciseContent(resource.metadata, resourceId);
                     } else if (resource.type === 'mind_map') {
                         bodyContent = renderMindMapContent(resource.metadata);
                     } else if (resource.type === 'reading_material') {
                         bodyContent = renderReadingContent(resource.metadata);
-                    } else if (resource.type === 'video_animation') {
-                        bodyContent = renderVideoContent(resource.metadata);
                     } else if (resource.type === 'code_practice') {
                         bodyContent = renderCodeContent(resource.metadata);
+                    } else if (resource.type === 'ppt_slides') {
+                        bodyContent = renderPPTSlidesContent(resource.metadata);
+                        exportButton = `<button class="btn btn-sm btn-primary" onclick="exportResource('${resourceId}', '${resource.title}')">📥 导出Markdown</button>`;
                     } else {
                         bodyContent = `<pre>${JSON.stringify(resource.metadata, null, 2)}</pre>`;
                     }
                 } else {
                     bodyContent = formatContent(resource.content || '暂无内容');
+                    if (resource.type === 'lecture_doc' || resource.type === 'ppt_slides') {
+                        exportButton = `<button class="btn btn-sm btn-primary" onclick="exportResource('${resourceId}', '${resource.title}')">📥 导出Markdown</button>`;
+                    }
                 }
-                
+
                 content.innerHTML = `
-                    <h2>${getTypeEmoji(resource.type)} ${resource.title}</h2>
+                    <h2 style="font-size:18px;margin-bottom:8px;">${getTypeEmoji(resource.type)} ${resource.title}</h2>
                     <div style="margin-bottom:12px;color:var(--text-light);font-size:13px;">
-                        ${resource.subject} · ${resource.topic} · ${getTypeName(resource.type)}
+                        ${resource.subject || ''} · ${resource.topic || ''} · ${getTypeName(resource.type)}
                     </div>
-                    <div class="content-body markdown-content">${bodyContent}</div>
-                    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+                    <div class="markdown-content">${bodyContent}</div>
+                    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;">
+                        ${exportButton}
                         <button class="btn btn-sm btn-accent" onclick="rateResource('${resourceId}', 5)">⭐ 好评</button>
                         <button class="btn btn-sm btn-secondary" onclick="rateResource('${resourceId}', 3)">👍 一般</button>
                         <button class="btn btn-sm btn-secondary" onclick="rateResource('${resourceId}', 1)">👎 差评</button>
                     </div>
                 `;
-                
+
                 modal.style.display = 'flex';
             } catch (err) {
                 alert('加载资源失败: ' + err.message);
@@ -1023,26 +1264,142 @@
         }
 
         // 资源内容渲染函数
-        function renderExerciseContent(meta) {
+        function renderExerciseContent(meta, resourceId) {
             let html = `<h3>${meta.title || '练习题'}</h3>`;
-            html += `<p>共 ${meta.total_questions || 0} 题 | 难度: ${meta.difficulty || '中等'}</p>`;
+            html += `<p>共 ${meta.total_questions || 0} 题 | 难度: ${meta.difficulty || '中等'} | 可自动批阅: ${meta.auto_gradable_count || 0} 题</p>`;
             const questions = meta.questions || [];
+            html += `<form id="exerciseForm_${resourceId}">`;
             questions.forEach((q, i) => {
-                html += `<div style="background:#F8FAFC;padding:12px;margin:8px 0;border-radius:8px;">
-                    <strong>${q.id || i+1}. [${q.type}] ${q.question || ''}</strong>`;
+                const qid = q.id || (i + 1);
+                const isAuto = ['选择', '填空', '判断'].includes(q.type);
+                html += `<div style="background:#F8FAFC;padding:12px;margin:8px 0;border-radius:8px;" data-qid="${qid}" data-type="${q.type}">
+                    <strong>${qid}. [${q.type}] ${q.question || ''}</strong>
+                    <span class="badge" style="margin-left:8px;">${isAuto ? '自动批阅' : 'AI点评'}</span>`;
                 if (q.options) {
-                    html += `<div style="margin:8px 0;">${q.options.map(o => `<div>${o}</div>`).join('')}</div>`;
+                    html += `<div style="margin:8px 0;">`;
+                    q.options.forEach((o, idx) => {
+                        const optVal = o.charAt(0); // A/B/C/D
+                        html += `<label style="display:block;margin:4px 0;cursor:pointer;">
+                            <input type="radio" name="q_${qid}" value="${optVal}" style="margin-right:6px;">${o}
+                        </label>`;
+                    });
+                    html += `</div>`;
+                } else {
+                    html += `<div style="margin:8px 0;">
+                        <textarea name="q_${qid}" rows="2" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;" placeholder="请输入答案..."></textarea>
+                    </div>`;
                 }
-                html += `<details style="margin-top:8px;">
-                    <summary style="cursor:pointer;color:var(--primary);">查看答案与解析</summary>
-                    <div style="margin-top:8px;padding:8px;background:#ECFDF5;border-radius:4px;">
-                        <strong>答案：</strong>${q.answer || ''}<br>
-                        <strong>解析：</strong>${q.analysis || ''}<br>
-                        <small>知识点: ${q.knowledge_point || ''} | 难度: ${q.difficulty || ''}</small>
-                    </div>
-                </details></div>`;
+                html += `</div>`;
             });
+            html += `</form>`;
+            html += `<div style="margin-top:16px;display:flex;gap:8px;">
+                <button class="btn btn-primary" onclick="submitExercise('${resourceId}')">✅ 一键批阅</button>
+                <button class="btn btn-secondary" onclick="showAnswers('${resourceId}')">👁️ 查看答案</button>
+            </div>`;
+            html += `<div id="gradeResult_${resourceId}" style="margin-top:16px;display:none;"></div>`;
             return html;
+        }
+
+        // 提交习题答案进行批阅
+        async function submitExercise(resourceId) {
+            const form = document.getElementById('exerciseForm_' + resourceId);
+            if (!form) return;
+
+            const answers = {};
+            const inputs = form.querySelectorAll('input[type="radio"]:checked, textarea');
+            inputs.forEach(input => {
+                const qid = input.name.replace('q_', '');
+                answers[qid] = input.value.trim();
+            });
+
+            showLoading('正在批阅...');
+            try {
+                const resp = await fetch(`/api/resources/${resourceId}/grade`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({answers: answers})
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    alert('批阅失败: ' + (data.detail || '未知错误'));
+                    return;
+                }
+
+                const result = data.grading_result;
+                const resultDiv = document.getElementById('gradeResult_' + resourceId);
+                resultDiv.style.display = 'block';
+
+                let html = `<div style="background:${result.score_rate >= 80 ? '#ECFDF5' : result.score_rate >= 60 ? '#FEF3C7' : '#FEE2E2'};padding:16px;border-radius:8px;margin-bottom:16px;">`;
+                html += `<h4>📊 批阅结果</h4>`;
+                html += `<p><strong>得分：</strong>${result.total_score} / ${result.max_score} (${result.score_rate}%)</p>`;
+                html += `<p><strong>正确率：</strong>${result.correct_count} / ${result.total_count} 题</p>`;
+                html += `</div>`;
+
+                // 显示每题详情
+                html += `<h4>题目详情</h4>`;
+                result.details.forEach(d => {
+                    const statusColor = d.is_correct ? '#10B981' : '#EF4444';
+                    const statusText = d.is_correct ? '✅ 正确' : '❌ 错误';
+                    html += `<div style="border-left:3px solid ${statusColor};padding:8px 12px;margin:8px 0;background:#F8FAFC;">`;
+                    html += `<strong>${d.id}. ${d.question.substring(0, 50)}...</strong> <span style="color:${statusColor};font-weight:600;">${statusText}</span><br>`;
+                    html += `<small>你的答案: ${d.student_answer || '未作答'} | 正确答案: ${d.correct_answer}</small><br>`;
+                    html += `<div style="margin-top:4px;padding:6px;background:#ECFDF5;border-radius:4px;font-size:12px;"><strong>解析：</strong>${d.analysis}</div>`;
+                    html += `</div>`;
+                });
+
+                resultDiv.innerHTML = html;
+
+                // 根据成绩更新画像（如果得分率较低，标记薄弱知识点）
+                if (result.score_rate < 60) {
+                    alert('⚠️ 本次练习得分率较低，建议重新学习相关知识点后再练习。');
+                } else if (result.score_rate >= 90) {
+                    alert('🎉 恭喜！本次练习表现优秀！');
+                }
+            } catch (err) {
+                alert('批阅失败: ' + err.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 显示所有答案
+        function showAnswers(resourceId) {
+            const form = document.getElementById('exerciseForm_' + resourceId);
+            if (!form) return;
+            const details = form.querySelectorAll('details');
+            details.forEach(d => d.open = true);
+        }
+
+        // 导出资源为 Markdown 文件
+        async function exportResource(resourceId, title) {
+            showLoading('准备导出...');
+            try {
+                const resp = await fetch(`/api/resources/${resourceId}`);
+                const resource = await resp.json();
+
+                let content = '';
+                if (resource.content) {
+                    content = resource.content;
+                } else if (resource.metadata) {
+                    content = JSON.stringify(resource.metadata, null, 2);
+                } else {
+                    content = '暂无内容';
+                }
+
+                const blob = new Blob([content], {type: 'text/markdown;charset=utf-8'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = (title || '学习资料') + '.md';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                alert('导出失败: ' + err.message);
+            } finally {
+                hideLoading();
+            }
         }
 
         function renderMindMapContent(meta) {
@@ -1089,22 +1446,45 @@
             return html;
         }
 
-        function renderVideoContent(meta) {
-            let html = `<h3>🎬 ${meta.title || '教学视频'}</h3>`;
-            html += `<p>风格: ${meta.style || ''} | 预估时长: ${meta.estimated_duration || ''}</p>`;
-            html += `<div><strong>学习目标：</strong><ul>${(meta.learning_objectives || []).map(o => `<li>${o}</li>`).join('')}</ul></div>`;
-            
-            const scenes = meta.scenes || [];
-            scenes.forEach(s => {
-                html += `<div style="background:#F8FAFC;padding:12px;margin:8px 0;border-radius:8px;border-left:3px solid var(--secondary);">
-                    <strong>场景 ${s.scene_id}: ${s.title || ''}</strong> <small>(${s.duration || ''}秒)</small>
-                    <p><strong>画面：</strong>${s.visual_description || ''}</p>
-                    <p><strong>旁白：</strong>${s.narration || ''}</p>
-                    ${s.on_screen_text ? `<p><small>屏幕文字: ${s.on_screen_text.join(' | ')}</small></p>` : ''}
-                </div>`;
+        function renderPPTSlidesContent(meta) {
+            let html = `<h3>📊 ${meta.title || '课件讲义'}</h3>`;
+            html += `<p>难度: ${meta.difficulty || '中等'} | 预估时长: ${meta.estimated_duration || ''}</p>`;
+            if (meta.summary) {
+                html += `<div style="background:#F8FAFC;padding:12px;border-radius:8px;margin:8px 0;"><strong>课程总结：</strong>${meta.summary}</div>`;
+            }
+
+            const chapters = meta.chapters || [];
+            chapters.forEach(ch => {
+                html += `<div style="background:#FFFFFF;padding:16px;margin:12px 0;border-radius:8px;border:1px solid var(--border);">`;
+                html += `<h4 style="color:var(--primary);">第${ch.chapter_id}章: ${ch.title || ''}</h4>`;
+                html += `<div style="margin:8px 0;line-height:1.8;">${formatContent(ch.content || '')}</div>`;
+
+                if (ch.key_points && ch.key_points.length > 0) {
+                    html += `<div style="background:#FEF3C7;padding:8px;border-radius:4px;margin:8px 0;"><strong>🔑 要点：</strong>${ch.key_points.join('、')}</div>`;
+                }
+
+                const quiz = ch.quiz || [];
+                if (quiz.length > 0) {
+                    html += `<div style="margin-top:12px;"><strong>📝 自测练习：</strong></div>`;
+                    quiz.forEach((q, i) => {
+                        html += `<div style="background:#F8FAFC;padding:8px;margin:6px 0;border-radius:4px;">`;
+                        html += `<strong>${i+1}. ${q.question}</strong>`;
+                        if (q.options) {
+                            html += `<div style="margin:4px 0;">${q.options.map(o => `<div style="margin:2px 0;">${o}</div>`).join('')}</div>`;
+                        }
+                        html += `<details style="margin-top:6px;"><summary style="cursor:pointer;color:var(--primary);font-size:12px;">查看答案</summary>`;
+                        html += `<div style="margin-top:4px;padding:6px;background:#ECFDF5;border-radius:4px;font-size:12px;">`;
+                        html += `<strong>答案：</strong>${q.answer}<br><strong>解析：</strong>${q.analysis}</div></details>`;
+                        html += `</div>`;
+                    });
+                }
+                html += `</div>`;
             });
-            
-            html += `<div style="margin-top:12px;"><strong>总结：</strong>${meta.summary || ''}</div>`;
+
+            const fr = meta.further_reading || [];
+            if (fr.length > 0) {
+                html += `<div style="margin-top:16px;"><h4>📚 延伸阅读</h4><ul>${fr.map(item => `<li>${item}</li>`).join('')}</ul></div>`;
+            }
             return html;
         }
 

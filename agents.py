@@ -198,41 +198,54 @@ class ProfileAgent(BaseAgent):
         """构建或更新画像"""
         messages = state.get("messages", [])
         existing_profile = state.get("student_profile", {})
-        
+
         # 构建分析提示
         conversation_text = "\n".join([
-            f"{'学生' if m['role'] == 'user' else '助手'}: {m['content']}" 
+            f"{'学生' if m['role'] == 'user' else '助手'}: {m['content']}"
             for m in messages[-10:]  # 最近10轮对话
         ])
-        
-        analysis_prompt = f"""请分析以下对话内容，提取学生的学习特征，构建多维度画像。
+
+        profile_json = json.dumps(existing_profile, ensure_ascii=False, indent=2) if existing_profile else "无（首次构建）"
+
+        analysis_prompt = """请分析以下对话内容，提取学生的学习特征，构建多维度画像。
 
 现有画像数据：
-{json.dumps(existing_profile, ensure_ascii=False, indent=2) if existing_profile else "无（首次构建）"}
+""" + profile_json + """
 
 对话内容：
-{conversation_text}
+""" + conversation_text + """
 
 请返回完整的JSON格式画像数据，包含以下8个维度：
-{{
-    "knowledge_base": {{"学科名": 分数(0-100)}},
-    "cognitive_style": {{"type": "visual/verbal/mixed", "visual_score": 分数, "verbal_score": 分数, "active_score": 分数, "reflective_score": 分数}},
-    "learning_preference": {{"preferred_formats": ["格式"], "preferred_duration": "时长", "preferred_difficulty": "难度"}},
-    "error_patterns": {{"常见错误类型": ["类型"], "易错知识点": ["知识点"], "错误频率": {{}}}},
-    "learning_pace": {{"speed": "速度", "avg_session_minutes": 分钟, "sessions_per_week": 次数, "completion_rate": 完成率}},
-    "goal_orientation": {{"short_term": ["目标"], "long_term": ["目标"], "priority": "优先级"}},
-    "subject_interests": {{"primary": ["兴趣"], "secondary": ["兴趣"], "interest_level": 分数}},
-    "learning_habits": {{"best_time": "时间", "note_taking": "方式", "review_frequency": "频率", "group_study": true/false}},
+{
+    "knowledge_base": {"学科名": 分数(0-100)},
+    "cognitive_style": {"type": "visual/verbal/mixed", "visual_score": 分数, "verbal_score": 分数, "active_score": 分数, "reflective_score": 分数},
+    "learning_preference": {"preferred_formats": ["格式"], "preferred_duration": "时长", "preferred_difficulty": "难度"},
+    "error_patterns": {"常见错误类型": ["类型"], "易错知识点": ["知识点"], "错误频率": {}},
+    "learning_pace": {"speed": "速度", "avg_session_minutes": 分钟, "sessions_per_week": 次数, "completion_rate": 完成率},
+    "goal_orientation": {"short_term": ["目标"], "long_term": ["目标"], "priority": "优先级"},
+    "subject_interests": {"primary": ["兴趣"], "secondary": ["兴趣"], "interest_level": 分数},
+    "learning_habits": {"best_time": "时间", "note_taking": "方式", "review_frequency": "频率", "group_study": true/false},
     "profile_summary": "综合画像文字描述"
-}}
+}
+
+【认知风格推断指南 - 必须遵守】
+认知风格绝对不要返回 "unknown"。请根据对话内容按以下规则推断：
+1. 视觉型(visual)：学生提到"看图""看视频""看图表""可视化""脑图""思维导图"，或表达喜欢"看"来学习
+2. 言语型(verbal)：学生提到"看书""读文字""听讲解""记笔记""文字描述"，或表达喜欢"读/听"来学习
+3. 主动型(active)：学生提到"动手做""写代码""做题""实践""尝试"，或表达喜欢"做中学"
+4. 反思型(reflective)：学生提到"先想想""理解原理""总结""回顾""思考"，或表达喜欢"想明白再动手"
+5. 如果对话中未明确提及学习偏好，请根据学生描述的学习行为进行合理推断（不要留unknown）
+6. 如果确实信息极少（如只有1轮对话），请给出 "mixed" 并设置 visual_score=50, verbal_score=50, active_score=50, reflective_score=50
 
 注意：
 - 如果现有画像已有数据，请在原有基础上更新（画像随学随新）
 - 对于无法从对话中推断的维度，保留现有值或使用合理默认值
-- 分数范围为0-100"""
-        
+- 分数范围为0-100
+- cognitive_style.type 绝对不要返回 "unknown"
+"""
+
         result = await self.llm.chat_json(self.build_messages(analysis_prompt), temperature=0.3)
-        
+
         return {
             **state,
             "student_profile": result,
@@ -240,20 +253,21 @@ class ProfileAgent(BaseAgent):
             "current_agent": self.name,
             "next_agents": []
         }
-    
+
     async def _query_profile(self, state: AgentState) -> AgentState:
         """查询并解释画像"""
         profile = state.get("student_profile", {})
         messages = state.get("messages", [])
         last_message = messages[-1]["content"] if messages else ""
-        
-        query_prompt = f"""学生询问：{last_message}
+
+        profile_json = json.dumps(profile, ensure_ascii=False, indent=2)
+
+        query_prompt = """学生询问：""" + last_message + """
 
 当前学习画像：
-{json.dumps(profile, ensure_ascii=False, indent=2)}
+""" + profile_json + """
+请用友好易懂的语言回答学生关于其学习画像的问题，并给出针对性的学习建议。"""
 
-请用友好、易懂的语言回答学生关于其学习画像的问题。可以给出针对性建议。"""
-        
         response = await self.think(query_prompt)
         
         return {
@@ -335,87 +349,99 @@ class ContentAgent(BaseAgent):
 
 
 class ExerciseAgent(BaseAgent):
-    """习题生成智能体 - 生成多类型练习题"""
-    
+    """习题生成智能体 - 生成多类型练习题（含一键批阅功能）"""
+
     def __init__(self):
         super().__init__(
             name="exercise_agent",
-            role="习题生成专家",
-            system_prompt="""你是一位专业的习题设计专家。你需要根据学生的学习情况，生成针对性的练习题。
+            role="习题生成与批阅专家",
+            system_prompt="""你是一位专业的习题设计与智能批阅专家。你需要根据学生的学习情况，生成针对性的练习题，并支持自动批阅。
 
 你可以生成的题型：
-1. 选择题（单选/多选）
-2. 填空题
-3. 判断题
-4. 简答题
-5. 编程实践题
-6. 案例分析题
+1. 选择题（单选/多选）- 支持自动判分
+2. 填空题 - 支持自动判分
+3. 判断题 - 支持自动判分
+4. 简答题 - AI智能点评
+5. 编程实践题 - AI智能点评
+6. 案例分析题 - AI智能点评
 
 习题设计原则：
 - 难度循序渐进
 - 覆盖核心知识点
 - 针对学生易错点
 - 包含详细解析
-- 提供参考答案"""
+- 提供标准答案和评分标准"""
         )
-    
+
     async def process(self, state: AgentState) -> AgentState:
         task_params = state.get("task_params", {})
         profile = state.get("student_profile", {})
-        
+
         subject = task_params.get("subject", "")
         topic = task_params.get("topic", "")
         exercise_type = task_params.get("exercise_type", "mixed")
         count = task_params.get("count", 10)
         difficulty = task_params.get("difficulty", "intermediate")
-        
+
         # 获取学生易错点
         error_patterns = profile.get("error_patterns", {})
         weak_points = error_patterns.get("易错知识点", [])
-        
-        prompt = f"""请生成一套针对性的练习题：
 
-科目：{subject}
-主题：{topic}
-题型：{exercise_type}（mixed表示混合题型）
-数量：{count}道
-难度：{difficulty}
+        prompt = """请生成一套针对性的练习题：
 
-学生易错知识点（需重点考察）：{', '.join(weak_points) if weak_points else '根据主题内容判断'}
+科目：""" + subject + """
+主题：""" + topic + """
+题型：""" + exercise_type + """（mixed表示混合题型）
+数量：""" + str(count) + """道
+难度：""" + difficulty + """
+
+学生易错知识点（需重点考察）：""" + (", ".join(weak_points) if weak_points else "根据主题内容判断") + """
 
 要求：
-1. 包含不同类型的题目
+1. 必须包含至少5道选择题（单选），用于自动批阅功能
 2. 难度循序渐进
-3. 每道题包含详细解析和参考答案
+3. 每道题包含：标准答案、详细解析、考察知识点、难度等级
 4. 针对学生薄弱环节设计题目
 5. 返回JSON格式
 
 输出格式：
-{{
+{
     "title": "练习题标题",
     "subject": "科目",
     "topic": "主题",
     "total_questions": 数量,
     "difficulty": "难度",
     "questions": [
-        {{
+        {
             "id": 1,
             "type": "选择/填空/判断/简答/编程/案例",
             "question": "题目内容",
-            "options": ["A. ...", "B. ..."],  // 仅选择题
-            "answer": "参考答案",
+            "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+            "answer": "标准答案（选择题填选项字母如A/B/C/D）",
             "analysis": "详细解析",
             "difficulty": "easy/medium/hard",
-            "knowledge_point": "考察的知识点"
-        }}
-    ]
-}}"""
-        
+            "knowledge_point": "考察的知识点",
+            "score": 10
+        }
+    ],
+    "auto_gradable_count": 可自动批阅题目数量,
+    "total_score": 总分
+}"""
+
         result = await self.llm.chat_json(self.build_messages(prompt), temperature=0.5)
-        
+
+        # 确保有批阅相关字段
+        questions = result.get("questions", [])
+        auto_count = 0
+        for q in questions:
+            if q.get("type") in ["选择", "填空", "判断"]:
+                auto_count += 1
+        result["auto_gradable_count"] = auto_count
+        result["total_score"] = sum(q.get("score", 10) for q in questions)
+
         resource = {
             "type": "exercise",
-            "title": f"{subject} - {topic} 练习题",
+            "title": subject + " - " + topic + " 练习题",
             "subject": subject,
             "topic": topic,
             "difficulty": difficulty,
@@ -424,12 +450,78 @@ class ExerciseAgent(BaseAgent):
             "format": "json",
             "metadata": result
         }
-        
+
         return {
             **state,
             "generated_resources": [resource],
             "current_agent": self.name,
             "next_agents": []
+        }
+
+    async def grade_exercise(self, exercise_metadata: Dict[str, Any],
+                            student_answers: Dict[str, str]) -> Dict[str, Any]:
+        """一键批阅习题
+        Args:
+            exercise_metadata: 习题元数据
+            student_answers: 学生答案 {question_id: answer}
+        Returns:
+            批阅结果
+        """
+        questions = exercise_metadata.get("questions", [])
+        total_score = 0
+        max_score = 0
+        details = []
+        wrong_questions = []
+
+        for q in questions:
+            qid = str(q.get("id", ""))
+            q_type = q.get("type", "")
+            correct_answer = str(q.get("answer", "")).strip().upper()
+            student_answer = str(student_answers.get(qid, "")).strip().upper()
+            score = q.get("score", 10)
+            max_score += score
+
+            is_correct = False
+            got_score = 0
+
+            if q_type in ["选择", "填空", "判断"]:
+                # 客观题自动判分
+                if student_answer == correct_answer:
+                    is_correct = True
+                    got_score = score
+                else:
+                    got_score = 0
+                    wrong_questions.append(q)
+            else:
+                # 主观题标记为需要AI批阅
+                got_score = -1  # 标记为待AI批阅
+
+            total_score += got_score if got_score >= 0 else 0
+
+            details.append({
+                "id": qid,
+                "type": q_type,
+                "question": q.get("question", ""),
+                "student_answer": student_answers.get(qid, ""),
+                "correct_answer": q.get("answer", ""),
+                "is_correct": is_correct,
+                "score": got_score,
+                "max_score": score,
+                "analysis": q.get("analysis", "")
+            })
+
+        # 计算得分率
+        score_rate = (total_score / max_score * 100) if max_score > 0 else 0
+
+        return {
+            "total_score": total_score,
+            "max_score": max_score,
+            "score_rate": round(score_rate, 1),
+            "correct_count": sum(1 for d in details if d["is_correct"]),
+            "total_count": len(questions),
+            "details": details,
+            "wrong_questions": wrong_questions,
+            "needs_ai_grading": any(d["score"] == -1 for d in details)
         }
 
 
@@ -692,90 +784,137 @@ class CodeAgent(BaseAgent):
         }
 
 
-class VideoAgent(BaseAgent):
-    """视频/动画智能体 - 生成教学视频脚本和说明"""
-    
+class PPTSlidesAgent(BaseAgent):
+    """PPT课件智能体 - 生成结构化课件讲义文档"""
+
     def __init__(self):
         super().__init__(
-            name="video_agent",
-            role="多媒体教学设计专家",
-            system_prompt="""你是一位多媒体教学设计专家。你需要设计教学视频/动画的脚本和分镜。
+            name="ppt_slides_agent",
+            role="课件讲义设计专家",
+            system_prompt="""你是一位专业的课件讲义设计专家。你需要根据学生的学习画像，生成结构清晰、内容详实的PPT课件/讲义文档。
 
-视频设计原则：
-- 时长适中（5-15分钟）
-- 内容循序渐进
-- 视觉化呈现抽象概念
-- 包含互动元素
-- 适配多模态学习需求"""
+课件设计原则：
+- 章节结构清晰，层次分明
+- 内容基于学生知识基础调整深度
+- 重点突出，难点详细讲解
+- 包含知识总结和思考题
+- 适合导出为Markdown/PDF格式阅读"""
         )
-    
+
     async def process(self, state: AgentState) -> AgentState:
         task_params = state.get("task_params", {})
         profile = state.get("student_profile", {})
-        
+
         subject = task_params.get("subject", "")
         topic = task_params.get("topic", "")
-        style = task_params.get("style", "tutorial")  # tutorial, animation, lecture
-        
-        prompt = f"""请设计一个教学视频脚本：
+        difficulty = task_params.get("difficulty", "intermediate")
 
-科目：{subject}
-主题：{topic}
-视频风格：{style}
-学生认知风格：{json.dumps(profile.get('cognitive_style', {}), ensure_ascii=False)}
-学生易错点：{json.dumps(profile.get('error_patterns', {}).get('易错知识点', []), ensure_ascii=False)}
+        prompt = """请为以下学生生成PPT课件/讲义文档：
+
+学生画像：
+""" + json.dumps(profile, ensure_ascii=False, indent=2) + """
+
+课程主题：""" + subject + """ - """ + topic + """
+难度级别：""" + difficulty + """
 
 要求：
-1. 设计完整的视频脚本
-2. 包含分镜描述
-3. 时长约8-12分钟
-4. 使用可视化元素解释概念
-5. 包含互动环节
-6. 返回JSON格式
+1. 按章节拆分内容，每章包含：标题、核心知识点、详细讲解、示例说明
+2. 根据学生知识基础调整内容深度（基础薄弱则补充前置知识，基础好则深入拓展）
+3. 针对学生易错点设置重点提示和警示框
+4. 每章末尾附2-3道选择题（含答案和解析），用于自测
+5. 使用Markdown格式，适合导出为PDF或打印阅读
+6. 内容全面，约3000-5000字
 
 输出格式：
-{{
-    "title": "视频标题",
+{
+    "title": "课件标题",
     "subject": "科目",
     "topic": "主题",
-    "style": "风格",
-    "estimated_duration": "预估时长",
-    "learning_objectives": ["目标1", "目标2"],
-    "scenes": [
-        {{
-            "scene_id": 1,
-            "title": "场景标题",
-            "duration": "时长（秒）",
-            "visual_description": "画面描述",
-            "narration": "旁白/讲解词",
-            "animations": ["动画效果描述"],
-            "on_screen_text": ["屏幕文字"],
-            "interactive_elements": ["互动元素"]
-        }}
+    "difficulty": "难度",
+    "estimated_duration": "预估学习时长",
+    "chapters": [
+        {
+            "chapter_id": 1,
+            "title": "章节标题",
+            "content": "章节正文内容（Markdown格式）",
+            "key_points": ["要点1", "要点2"],
+            "quiz": [
+                {
+                    "question": "选择题题干",
+                    "options": ["A. 选项1", "B. 选项2", "C. 选项3", "D. 选项4"],
+                    "answer": "A",
+                    "analysis": "答案解析"
+                }
+            ]
+        }
     ],
-    "key_visuals": ["关键可视化元素"],
-    "summary": "视频总结"
-}}"""
-        
+    "summary": "整体知识总结",
+    "further_reading": ["延伸阅读建议1", "建议2"]
+}"""
+
         result = await self.llm.chat_json(self.build_messages(prompt), temperature=0.6)
-        
+
+        # 同时生成纯Markdown文本版本用于导出
+        md_content = self._build_markdown(result, subject, topic)
+
         resource = {
-            "type": "video_animation",
-            "title": f"{subject} - {topic} 教学视频",
+            "type": "ppt_slides",
+            "title": subject + " - " + topic + " 课件讲义",
             "subject": subject,
             "topic": topic,
-            "content": json.dumps(result, ensure_ascii=False),
+            "difficulty": difficulty,
+            "content": md_content,
             "generated_by": self.name,
-            "format": "json",
+            "format": "markdown",
             "metadata": result
         }
-        
+
         return {
             **state,
             "generated_resources": [resource],
             "current_agent": self.name,
             "next_agents": []
         }
+
+    def _build_markdown(self, result: Dict[str, Any], subject: str, topic: str) -> str:
+        """将JSON课件数据转为Markdown文本"""
+        md = "# " + (result.get("title", subject + " - " + topic + " 课件讲义")) + "\n\n"
+        md += "> 科目：" + subject + " | 主题：" + topic + "\n\n"
+        md += "---\n\n"
+
+        for ch in result.get("chapters", []):
+            md += "## " + str(ch.get("chapter_id", "")) + ". " + ch.get("title", "") + "\n\n"
+            md += ch.get("content", "") + "\n\n"
+
+            key_points = ch.get("key_points", [])
+            if key_points:
+                md += "**本章要点：**\n"
+                for kp in key_points:
+                    md += "- " + kp + "\n"
+                md += "\n"
+
+            quiz = ch.get("quiz", [])
+            if quiz:
+                md += "**自测练习：**\n\n"
+                for i, q in enumerate(quiz, 1):
+                    md += str(i) + ". " + q.get("question", "") + "\n"
+                    for opt in q.get("options", []):
+                        md += "   " + opt + "\n"
+                    md += "   **答案：**" + q.get("answer", "") + "\n"
+                    md += "   **解析：**" + q.get("analysis", "") + "\n\n"
+            md += "---\n\n"
+
+        summary = result.get("summary", "")
+        if summary:
+            md += "## 总结\n\n" + summary + "\n\n"
+
+        fr = result.get("further_reading", [])
+        if fr:
+            md += "## 延伸阅读\n\n"
+            for item in fr:
+                md += "- " + item + "\n"
+
+        return md
 
 
 class PathAgent(BaseAgent):
@@ -996,7 +1135,7 @@ class EvaluationAgent(BaseAgent):
         
         prompt = f"""请对以下学生的学习效果进行多维度评估：
 
-学生画像：
+学生画像
 {json.dumps(profile, ensure_ascii=False, indent=2)}
 
 学习数据：
@@ -1079,11 +1218,11 @@ class OrchestratorAgent(BaseAgent):
                 "current_agent": self.name,
                 "next_agents": [
                     "content_agent",
-                    "exercise_agent", 
+                    "exercise_agent",
                     "mindmap_agent",
                     "reading_agent",
                     "code_agent",
-                    "video_agent"
+                    "ppt_slides_agent"
                 ],
                 "is_complete": False
             }
@@ -1125,10 +1264,10 @@ class OrchestratorAgent(BaseAgent):
 可用智能体：
 - profile_agent: 构建/更新学习画像
 - content_agent: 生成课程讲解文档
-- exercise_agent: 生成练习题
+- exercise_agent: 生成练习题（含自动批阅）
 - mindmap_agent: 生成思维导图
 - reading_agent: 生成拓展阅读
-- video_agent: 生成教学视频脚本
+- ppt_slides_agent: 生成课件讲义文档
 - code_agent: 生成代码实操案例
 - path_agent: 规划学习路径
 - tutor_agent: 辅导答疑
@@ -1160,7 +1299,7 @@ class MultiAgentSystem:
             "exercise_agent": ExerciseAgent(),
             "mindmap_agent": MindMapAgent(),
             "reading_agent": ReadingAgent(),
-            "video_agent": VideoAgent(),
+            "ppt_slides_agent": PPTSlidesAgent(),
             "code_agent": CodeAgent(),
             "path_agent": PathAgent(),
             "tutor_agent": TutorAgent(),
@@ -1184,7 +1323,7 @@ class MultiAgentSystem:
         workflow.add_node("exercise_agent", self._agent_node("exercise_agent"))
         workflow.add_node("mindmap_agent", self._agent_node("mindmap_agent"))
         workflow.add_node("reading_agent", self._agent_node("reading_agent"))
-        workflow.add_node("video_agent", self._agent_node("video_agent"))
+        workflow.add_node("ppt_slides_agent", self._agent_node("ppt_slides_agent"))
         workflow.add_node("code_agent", self._agent_node("code_agent"))
         workflow.add_node("path_agent", self._agent_node("path_agent"))
         workflow.add_node("tutor_agent", self._agent_node("tutor_agent"))
@@ -1282,7 +1421,7 @@ class MultiAgentSystem:
             ("mindmap_agent", {"subject": subject, "topic": topic}),
             ("reading_agent", {"subject": subject, "topic": topic}),
             ("code_agent", {"subject": subject, "topic": topic, "language": "python"}),
-            ("video_agent", {"subject": subject, "topic": topic, "style": "tutorial"}),
+            ("ppt_slides_agent", {"subject": subject, "topic": topic, "difficulty": "intermediate"}),
         ]
         
         state = {
