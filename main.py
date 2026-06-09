@@ -214,6 +214,26 @@ async def get_student(student_id: str, db: AsyncSession = Depends(get_db)):
     return student_to_dict(student)
 
 
+
+@app.get("/api/students/{student_id}/conversations")
+async def get_conversations(student_id: str, db: AsyncSession = Depends(get_db)):
+    """获取学生对话历史"""
+    student_result = await db.execute(
+        select(Student).where(Student.student_id == student_id)
+    )
+    student = student_result.scalar_one_or_none()
+    if not student:
+        return {"messages": []}
+
+    conv_result = await db.execute(
+        select(Conversation).where(
+            Conversation.student_id == student.id
+        ).order_by(Conversation.created_at.desc()).limit(1)
+    )
+    conv = conv_result.scalar_one_or_none()
+    messages = conv.messages if conv and conv.messages else []
+    return {"messages": messages}
+
 @app.get("/api/students/{student_id}/profile")
 async def get_student_profile(student_id: str, db: AsyncSession = Depends(get_db)):
     """获取学生画像"""
@@ -346,7 +366,6 @@ async def generate_resources(request: ResourceGenerateRequest, db: AsyncSession 
     # 保存资源到数据库
     saved_resources = []
     for resource in resources:
-        resource_id = str(uuid.uuid4())
         db_resource = LearningResource(
             resource_type=resource.get("type", ""),
             title=resource.get("title", ""),
@@ -358,17 +377,19 @@ async def generate_resources(request: ResourceGenerateRequest, db: AsyncSession 
             target_student_id=student.id,
             extra_data=resource.get("metadata", {}),
             generation_params={"subject": request.subject, "topic": request.topic}
-        )
-        db.add(db_resource)
-        saved_resources.append({
-            "id": resource_id,
-            "type": resource.get("type"),
-            "title": resource.get("title"),
-            "subject": resource.get("subject"),
-            "topic": resource.get("topic"),
-            "difficulty": resource.get("difficulty"),
-            "generated_by": resource.get("generated_by")
-        })
+    )
+    db.add(db_resource)
+    await db.flush()  # 获取真实数据库 ID
+    saved_resources.append({
+        "id": db_resource.id,
+        "type": db_resource.resource_type,
+        "title": db_resource.title,
+        "subject": db_resource.subject,
+        "topic": db_resource.topic,
+        "difficulty": db_resource.difficulty,
+        "content": db_resource.content,
+        "generated_by": db_resource.generated_by
+    })
 
     # 保存学习路径
     if learning_path_data:
@@ -397,7 +418,7 @@ async def generate_resources(request: ResourceGenerateRequest, db: AsyncSession 
 async def get_resource(resource_id: str, db: AsyncSession = Depends(get_db)):
     """获取单个资源详情"""
     result = await db.execute(
-        select(LearningResource).where(LearningResource.id == int(resource_id))
+        select(LearningResource).where(LearningResource.id == resource_id)
     )
     resource = result.scalar_one_or_none()
     if not resource:

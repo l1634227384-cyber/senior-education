@@ -759,7 +759,21 @@
             if (ws) ws.close();
             ws = new WebSocket(`ws://${location.host}/ws/chat/${studentId}`);
 
-            ws.onopen = () => console.log('WebSocket 已连接');
+            ws.onopen = async () => {
+                console.log('WebSocket 已连接');
+                try {
+                    const resp = await fetch(`/api/students/${studentId}/conversations`);
+                    const data = await resp.json();
+                    const messages = data.messages || [];
+                    messages.forEach(msg => {
+                        if (msg.role === 'user' || msg.role === 'assistant') {
+                            addChatMessage(msg.role, msg.content);
+                        }
+                    });
+                } catch (e) {
+                    console.log('历史加载失败', e);
+                }
+            };
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
