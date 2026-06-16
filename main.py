@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, Depends
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -16,7 +16,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
-from agents import multi_agent_system
+from agents import multi_agent_system, LLMClient
 
 from models import (
     init_db, get_session_direct, async_session, Student, StudentProfile, LearningResource,
@@ -628,6 +628,117 @@ async def generate_resources(request: ResourceGenerateRequest, db: AsyncSession 
         "learning_path": learning_path_data,
         "total_resources": len(saved_resources)
     }
+
+
+@app.get("/api/generate/stream")
+async def generate_resources_stream(student_id: str, subject: str, topic: str, db: AsyncSession = Depends(get_db)):
+    """SSE 流式生成接口：先展示模型的思考过程(reasoning_content)，再触发后端实际资源生成并返回结果。
+
+    前端通过 EventSource 订阅本接口（GET），查询参数：student_id, subject, topic
+    """
+    # 准备学生与画像
+    student = await _get_student(db, student_id)
+    profile = await _get_or_create_profile(db, student.id)
+    profile_dict = profile_to_dict(profile)
+
+    llm = LLMClient()
+
+    system_msg = {
+        "role": "system",
+        "content": "你是一位高等教育学习资源生成助手。在流式响应中，请对你的思考过程使用字段 reasoning_content 分段输出（描述决策、步骤、优先级与要点），并在最终输出字段 content 中给出简短总结。启用thinking模式。"
+    }
+    user_msg = {
+        "role": "user",
+        "content": f"请为科目：{subject}，主题：{topic} 生成完整的学习资源集合（课程讲解、习题、思维导图、拓展阅读、代码实操、课件），在思考过程中分步说明你将如何组织内容及侧重点，最终给出简短总结。"
+    }
+
+    async def event_stream():
+        try:
+            # 1) 流式思考展示
+            async for chunk in llm.stream_chat([system_msg, user_msg], temperature=0.6, max_tokens=1024):
+                try:
+                    if not isinstance(chunk, dict):
+                        continue
+                    if chunk.get('type') == 'reasoning':
+                        ev = {"type": "reasoning", "content": chunk.get('content', '')}
+                        yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+                    elif chunk.get('type') == 'answer':
+                        ev = {"type": "answer", "content": chunk.get('content', '')}
+                        yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+                except Exception:
+                    continue
+
+            # 标记思考阶段结束
+            yield f"data: {json.dumps({'type': 'thinking_done'})}\n\n"
+
+            # 2) 后端实际生成并保存资源（与原 /api/resources/generate 行为一致）
+            yield f"data: {json.dumps({'type': 'generation_start', 'message': '开始在后端生成并保存资源'})}\n\n"
+            result = await multi_agent_system.generate_all_resources(subject=subject, topic=topic, profile=profile_dict, student_id=student_id)
+            resources = result.get('resources', [])
+            learning_path_data = result.get('learning_path')
+
+            # 保存资源到数据库
+            saved_resources = []
+            for resource in resources:
+                try:
+                    db_resource = LearningResource(
+                        resource_type=resource.get('type', ''),
+                        title=resource.get('title', ''),
+                        subject=resource.get('subject', ''),
+                        topic=resource.get('topic', ''),
+                        difficulty=resource.get('difficulty', 'intermediate'),
+                        content=resource.get('content', ''),
+                        generated_by=resource.get('generated_by', ''),
+                        target_student_id=student.id,
+                        extra_data=resource.get('metadata', {}),
+                        generation_params={"subject": subject, "topic": topic}
+                    )
+                    db.add(db_resource)
+                    await db.flush()
+                    saved_resources.append({
+                        "id": db_resource.id,
+                        "type": db_resource.resource_type,
+                        "title": db_resource.title,
+                        "subject": db_resource.subject,
+                        "topic": db_resource.topic,
+                        "difficulty": db_resource.difficulty,
+                        "content": db_resource.content,
+                        "generated_by": db_resource.generated_by,
+                        "created_at": db_resource.created_at.isoformat() if db_resource.created_at else None
+                    })
+                except Exception as e:
+                    print(f"[SSE 保存资源失败] {e}")
+                    import traceback
+                    traceback.print_exc()
+
+            # 保存学习路径
+            if learning_path_data:
+                db_path = LearningPath(
+                    student_id=student.id,
+                    subject=subject,
+                    title=learning_path_data.get('title', f"{subject} - {topic}"),
+                    steps=learning_path_data.get('phases', []),
+                    current_step=0,
+                    progress=0.0,
+                    is_active=True
+                )
+                db.add(db_path)
+
+            await db.commit()
+
+            # 3) 推送最终结果
+            final_ev = {
+                "type": "done",
+                "resources": saved_resources,
+                "learning_path": learning_path_data,
+                "total": len(saved_resources)
+            }
+            yield f"data: {json.dumps(final_ev, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            err_ev = {"type": "error", "message": str(e)}
+            yield f"data: {json.dumps(err_ev, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(event_stream(), media_type='text/event-stream')
 
 
 @app.get("/api/resources/{resource_id}")
