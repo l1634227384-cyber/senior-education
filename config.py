@@ -32,10 +32,14 @@ class Settings:
     # 嵌入模型配置
     EMBEDDING_MODEL: str = "text-embedding-3-small"
 
-    # 数据库配置
+    # 数据库配置 - 使用本地 SQLite，每个协作者拥有独立的数据库文件
+    # 可通过环境变量 DATABASE_URL 覆盖，或设置 DB_PATH 指定自定义路径
+    # 格式: sqlite+aiosqlite:///绝对路径
+    # 默认数据库文件位于项目 data/ 目录下
+    _db_path: str = os.getenv("DB_PATH", str(BASE_DIR / "data" / "learning_system.db"))
     DATABASE_URL: str = os.getenv(
-    "DATABASE_URL",
-    "mysql+aiomysql://admin:admin123@10.78.202.91:3306/edu_agent"
+        "DATABASE_URL",
+        f"sqlite+aiosqlite:///{_db_path}"
     )
 
     # 文件存储

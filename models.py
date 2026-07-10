@@ -11,7 +11,16 @@ from config import settings
 Base = declarative_base()
 
 # 异步引擎
-engine = create_async_engine(settings.DATABASE_URL, echo=False)
+# SQLite 需要 check_same_thread=False 以支持多协程并发访问
+_connect_args = {}
+if "sqlite" in settings.DATABASE_URL:
+    _connect_args = {"check_same_thread": False}
+
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=False,
+    connect_args=_connect_args
+)
 async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
@@ -238,6 +247,12 @@ async def init_db():
     """初始化数据库"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    
+    # 打印数据库路径信息，方便协作者确认
+    import os
+    db_path = settings.DATABASE_URL.replace("sqlite+aiosqlite:///", "")
+    print(f"[数据库] 使用本地 SQLite 数据库: {db_path}")
+    print(f"[数据库] 文件大小: {os.path.getsize(db_path) if os.path.exists(db_path) else '新建'}")
 
 
 async def get_session():

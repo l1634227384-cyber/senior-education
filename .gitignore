@@ -1,6 +1,7 @@
 .env 
 __pycache__/ 
 *.pyc 
-data/ 
+data/*.db
+data/*.sqlite*
 .idea/ 
 test_env.py 
