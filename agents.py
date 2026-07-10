@@ -79,9 +79,22 @@ class LLMClient:
                    max_tokens: int = None) -> str:
         """发送对话请求"""
         try:
+            # DeepSeek / 部分 LLM 接口对 messages 中的额外字段（例如 id）敏感，
+            # 可能会导致 Duplicate item 错误（例如重复的 msg_123）。
+            # 仅保留 API 需要的字段：role 和 content。
+            cleaned_messages = []
+            for m in messages:
+                # 只保留 role 和 content，避免传递 timestamp、id 等自定义字段
+                role = m.get("role")
+                content = m.get("content", "")
+                if role is None:
+                    # 如果没有 role，则跳过该条消息
+                    continue
+                cleaned_messages.append({"role": role, "content": content})
+
             kwargs = {
                 "model": self.model,
-                "messages": messages,
+                "messages": cleaned_messages,
                 "temperature": temperature or settings.LLM_TEMPERATURE,
                 "max_tokens": max_tokens or settings.LLM_MAX_TOKENS,
             }
@@ -124,6 +137,93 @@ class LLMClient:
         except json.JSONDecodeError:
             # 解析失败时记录原始响应并抛出，让调用方处理
             raise ValueError(f"LLM 返回内容无法解析为 JSON: {result[:200]}...")
+
+    async def stream_chat(self, messages: List[Dict[str, str]],
+                          temperature: float = None,
+                          max_tokens: int = None):
+        """流式调用 LLM，支持 DeepSeek 的 thinking 流式返回。
+        返回一个异步生成器，每次产出一个 dict，包含 {"type": "reasoning"|"answer", "content": str}
+        """
+        # 使用 httpx 直接发送请求以便逐行读取 stream
+        import aiohttp
+        from urllib.parse import urljoin
+
+        base = settings.LLM_API_BASE.rstrip('/')
+        url = urljoin(base + '/', 'v1/chat/completions')
+
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature or settings.LLM_TEMPERATURE,
+            "max_tokens": max_tokens or settings.LLM_MAX_TOKENS,
+            # DeepSeek 思考模式开启
+            "extra_body": {"thinking": {"type": "enabled"}},
+            "stream": True
+        }
+
+        headers = {
+            "Authorization": f"Bearer {settings.LLM_API_KEY}",
+            "Content-Type": "application/json"
+        }
+
+        # 使用 aiohttp 进行流式请求并逐行解析 Server-Sent style 数据
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload, headers=headers) as resp:
+                # 非200直接抛错
+                if resp.status != 200:
+                    text = await resp.text()
+                    raise RuntimeError(f"LLM stream 接口错误: {resp.status} - {text[:200]}")
+
+                async for raw_line in resp.content:
+                    if not raw_line:
+                        continue
+                    try:
+                        line = raw_line.decode('utf-8').strip()
+                    except Exception:
+                        continue
+                    # 忽略空行
+                    if not line:
+                        continue
+
+                    # OpenAI-style streaming often sends lines that begin with "data: "
+                    if line.startswith('data:'):
+                        payload_text = line[len('data:'):].strip()
+                        if payload_text == '[DONE]':
+                            break
+                        try:
+                            obj = json.loads(payload_text)
+                        except Exception:
+                            # 非 JSON 行直接作为 reasoning 输出
+                            yield {"type": "reasoning", "content": payload_text}
+                            continue
+
+                        # DeepSeek-like structure: choices[0].delta may include reasoning_content or content
+                        try:
+                            choices = obj.get('choices', [])
+                            if choices:
+                                delta = choices[0].get('delta', {})
+                                rc = delta.get('reasoning_content') or delta.get('reasoning')
+                                ct = delta.get('content') or delta.get('message')
+                                if rc:
+                                    yield {"type": "reasoning", "content": rc}
+                                elif ct:
+                                    # 有时 content 是对象，尝试取字符串
+                                    if isinstance(ct, dict):
+                                        text = ct.get('content', '') if 'content' in ct else json.dumps(ct, ensure_ascii=False)
+                                    else:
+                                        text = ct
+                                    yield {"type": "answer", "content": text}
+                                else:
+                                    # 尝试查找 choices[0].message.content
+                                    msg = choices[0].get('message', {})
+                                    if msg and msg.get('content'):
+                                        yield {"type": "answer", "content": msg.get('content')}
+                        except Exception:
+                            # 无法解析结构时，直接返回原始 JSON 文本
+                            yield {"type": "reasoning", "content": json.dumps(obj, ensure_ascii=False)}
+                    else:
+                        # 不是 data: 行，直接发送
+                        yield {"type": "reasoning", "content": line}
 
 
 # ==================== 基础智能体类 ====================
@@ -1519,34 +1619,58 @@ class MultiAgentSystem:
             "error": None,
         }
 
-        async def run_agent(agent_name: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
-            """并行执行单个智能体"""
+        async def run_agent(agent_name: str, params: Dict[str, Any]):
+            """并行执行单个智能体，带超时与异常处理。返回 (resources, failure_info_or_None) """
             agent = self.agents[agent_name]
             agent_state = {**state, "task_params": params}
             try:
                 print(f"[资源生成] 开始调用 {agent_name} ...")
-                result_state = await agent.process(agent_state)
+                # 对每个 agent.process 添加超时保护
+                result_state = await asyncio.wait_for(agent.process(agent_state), timeout=30)
                 resources = result_state.get("generated_resources", [])
                 print(f"[资源生成] {agent_name} 生成完成，产出 {len(resources)} 个资源")
                 for r in resources:
                     print(f"  - 类型: {r.get('type', 'unknown')}, 标题: {r.get('title', '无标题')[:40]}")
-                return resources
-            except Exception as e:
-                print(f"[警告] 智能体 {agent_name} 生成失败: {e}")
+                return resources, None
+            except asyncio.TimeoutError as e:
+                # 超时视作失败，返回空资源并记录错误信息
+                err_msg = f"timeout after 30s"
+                print(f"[警告] 智能体 {agent_name} 超时: {err_msg}")
                 import traceback
                 traceback.print_exc()
-                return []
+                return [], {"agent": agent_name, "error": err_msg}
+            except Exception as e:
+                # 捕获其他异常，返回空资源并记录错误信息
+                err_msg = str(e)
+                print(f"[警告] 智能体 {agent_name} 生成失败: {err_msg}")
+                import traceback
+                traceback.print_exc()
+                return [], {"agent": agent_name, "error": err_msg}
 
-        # 真正并行执行所有资源生成智能体
-        results = await asyncio.gather(*[
-            run_agent(agent_name, params)
-            for agent_name, params in resource_agents
-        ])
+        # 真正并行执行所有资源生成智能体，使用 return_exceptions=True
+        tasks = [run_agent(agent_name, params) for agent_name, params in resource_agents]
+        raw_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # 汇总所有生成结果
+        # 汇总所有生成结果，并记录失败的智能体
         all_resources = []
-        for resources in results:
-            all_resources.extend(resources)
+        failed_agents: List[Dict[str, str]] = []
+        for (agent_name, _), res in zip(resource_agents, raw_results):
+            # 如果 run_agent 未捕获到异常而返回了元组 (resources, failure_info)
+            if isinstance(res, Exception):
+                # asyncio.gather 捕获到未被捕获的异常
+                err_msg = str(res)
+                print(f"[警告] 智能体 {agent_name} 未捕获异常: {err_msg}")
+                import traceback
+                traceback.print_exc()
+                failed_agents.append({"agent": agent_name, "error": err_msg})
+                continue
+
+            # 正常返回 (resources, failure_info)
+            resources, failure_info = res
+            if failure_info:
+                failed_agents.append(failure_info)
+            if resources:
+                all_resources.extend(resources)
 
         print(f"[资源生成] 总共生成 {len(all_resources)} 个资源")
 
@@ -1576,7 +1700,9 @@ class MultiAgentSystem:
         return {
             "resources": all_resources,
             "learning_path": path_result.get("learning_path"),
-            "profile": profile
+            "profile": profile,
+            # 返回失败的智能体信息（可能为空）
+            "failed_agents": failed_agents
         }
 
     def _create_default_resource(self, resource_type: str, subject: str, topic: str) -> Dict[str, Any]:

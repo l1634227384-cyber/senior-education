@@ -1932,43 +1932,86 @@
             return result;
         }
 
-        // 生成资源
+        // 生成资源（使用 SSE 流式展示思考过程）
         async function generateResources(subject, topic) {
-            addChatMessage('assistant', `正在为你生成「${subject} - ${topic}」的个性化学习资源，请稍候...`);
+            // 在聊天区新增一条 assistant 消息，包含可折叠的思考过程面板
+            const container = document.getElementById('chatMessages');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'chat-message assistant';
+            const uniqueId = 'thinking_' + Date.now();
+            wrapper.innerHTML = `
+                <div class="chat-avatar">🤖</div>
+                <div class="chat-bubble" id="${uniqueId}_bubble">
+                    <div id="${uniqueId}_summary">正在为你生成「${escapeHtml(subject)} - ${escapeHtml(topic)}」的个性化学习资源，请稍候...</div>
+                    <details id="${uniqueId}_details" style="margin-top:8px;">
+                        <summary>🧠 思考过程（实时）</summary>
+                        <div style="max-height:240px;overflow:auto;padding:8px;background:#0f172a;color:#e6eef8;border-radius:6px;margin-top:8px;white-space:pre-wrap;font-family:monospace;" id="${uniqueId}_reasoning"></div>
+                    </details>
+                </div>`;
+            container.appendChild(wrapper);
+            container.scrollTop = container.scrollHeight;
 
-            const resp = await fetch('/api/resources/generate', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    student_id: currentStudentId,
-                    subject: subject,
-                    topic: topic
-                })
-            });
+            // 打开 SSE 连接（使用 GET）
+            const url = `/api/generate/stream?student_id=${encodeURIComponent(currentStudentId)}&subject=${encodeURIComponent(subject)}&topic=${encodeURIComponent(topic)}`;
+            const es = new EventSource(url);
 
-            const data = await resp.json();
-            const newResources = data.resources || [];
-            learningPath = data.learning_path;
+            const reasoningEl = document.getElementById(`${uniqueId}_reasoning`);
+            const bubbleSummary = document.getElementById(`${uniqueId}_summary`);
 
-            // 追加到已有资源列表，而不是覆盖
-            allResources = [...allResources, ...newResources];
+            es.onmessage = async (evt) => {
+                try {
+                    const data = JSON.parse(evt.data);
+                    if (!data || !data.type) return;
 
-            // 更新资源视图
-            renderResources();
+                    if (data.type === 'reasoning') {
+                        reasoningEl.textContent += data.content + '\n';
+                        reasoningEl.scrollTop = reasoningEl.scrollHeight;
+                    } else if (data.type === 'answer') {
+                        // 将最终的简短 answer 显示为气泡摘要
+                        bubbleSummary.innerHTML = formatContent(data.content || '（模型返回了结果）');
+                    } else if (data.type === 'thinking_done') {
+                        // 可选：在思考完成时更改状态
+                        bubbleSummary.innerHTML = '<strong>思考完成，正在生成资源并保存...</strong>';
+                    } else if (data.type === 'generation_start') {
+                        bubbleSummary.innerHTML = '<strong>后端开始生成资源，稍候将展示生成结果...</strong>';
+                    } else if (data.type === 'done') {
+                        // 关闭 EventSource
+                        es.close();
 
-            // 更新路径视图
-            if (learningPath) {
-                renderLearningPath();
-            }
+                        const resources = data.resources || [];
+                        const learning_path = data.learning_path || null;
 
-            const resourceList = newResources.map(r => `- ${getTypeEmoji(r.type)} ${r.title}`).join('\n');
-            addChatMessage('assistant', `✅ 已为你生成 **${newResources.length}** 个个性化学习资源：\n\n${resourceList}\n\n📋 学习路径已规划完成，请查看「学习路径」标签。`);
+                        // 将新资源追加到本地列表并渲染
+                        allResources = [...allResources, ...resources];
+                        renderResources();
+                        if (learning_path) {
+                            learningPath = learning_path;
+                            renderLearningPath();
+                        }
 
-            // 自动切换到资源视图
-            switchTab('resources');
-            
-            // 更新学习进度
-            await loadLearningProgress();
+                        // 在聊天区显示完成提示和生成结果列表
+                        const listText = resources.map(r => `- ${getTypeEmoji(r.type)} ${r.title}`).join('\n');
+                        addChatMessage('assistant', `✅ 已为你生成 ${resources.length} 个个性化学习资源：\n\n${listText}`);
+
+                        // 更新学习进度
+                        await loadLearningProgress();
+                    } else if (data.type === 'error') {
+                        es.close();
+                        addChatMessage('assistant', '❌ 生成失败: ' + (data.message || '未知错误'));
+                    }
+                } catch (err) {
+                    console.error('SSE 解析出错', err);
+                }
+            };
+
+            es.onerror = (err) => {
+                console.error('EventSource 错误', err);
+                es.close();
+                hideLoading();
+            };
+
+            // 确保自动滚动到思考面板
+            setTimeout(() => { reasoningEl.scrollTop = reasoningEl.scrollHeight; }, 200);
         }
 
         // 获取资源类型图标
