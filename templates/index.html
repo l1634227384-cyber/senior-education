@@ -4,58 +4,124 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>高等教育个性化学习资源智能体系统</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #4F46E5;
+            --primary: #4338CA;
             --primary-light: #818CF8;
-            --primary-dark: #3730A3;
-            --secondary: #06B6D4;
-            --accent: #F59E0B;
-            --success: #10B981;
-            --danger: #EF4444;
-            --bg: #F8FAFC;
+            --primary-dark: #312E81;
+            --primary-soft: #EEF2FF;
+            --secondary: #0891B2;
+            --secondary-soft: #ECFEFF;
+            --accent: #D97706;
+            --accent-soft: #FFFBEB;
+            --success: #059669;
+            --success-soft: #ECFDF5;
+            --danger: #DC2626;
+            --danger-soft: #FEF2F2;
+            --bg: #F4F5FA;
             --bg-card: #FFFFFF;
-            --text: #1E293B;
-            --text-light: #64748B;
-            --border: #E2E8F0;
-            --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
-            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
-            --radius: 12px;
-            --radius-sm: 8px;
+            --bg-sunken: #F8F9FC;
+            --text: #16192E;
+            --text-light: #6B7089;
+            --text-faint: #9599B0;
+            --border: #E7E8F2;
+            --border-soft: #F0F1F8;
+            --gradient-brand: linear-gradient(135deg, #4338CA 0%, #6D28D9 100%);
+            --shadow-xs: 0 1px 2px rgba(22,25,46,0.04);
+            --shadow: 0 2px 8px -2px rgba(22,25,46,0.08), 0 1px 3px -1px rgba(22,25,46,0.06);
+            --shadow-lg: 0 12px 24px -6px rgba(22,25,46,0.12), 0 4px 8px -4px rgba(22,25,46,0.08);
+            --shadow-glow: 0 8px 24px -4px rgba(67,56,202,0.25);
+            --radius: 14px;
+            --radius-sm: 10px;
+            --radius-lg: 20px;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
+        html { scroll-behavior: smooth; }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            font-family: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
             background: var(--bg);
             color: var(--text);
             line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #D5D7E5; border-radius: 8px; }
+        ::-webkit-scrollbar-thumb:hover { background: #B8BBD1; }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         /* 导航栏 */
         .navbar {
-            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+            background: var(--gradient-brand);
             color: white;
-            padding: 0 24px;
-            height: 64px;
+            padding: 0 28px;
+            height: 60px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: var(--shadow-lg);
+            box-shadow: 0 4px 20px -4px rgba(67,56,202,0.35);
             position: sticky;
             top: 0;
             z-index: 100;
         }
         .navbar .logo {
-            font-size: 20px;
+            font-size: 17px;
             font-weight: 700;
+            letter-spacing: 0.2px;
             display: flex;
             align-items: center;
             gap: 10px;
         }
-        .navbar .logo .icon { font-size: 28px; }
-        .navbar .nav-links { display: flex; gap: 8px; }
+        .navbar .logo .icon {
+            font-size: 20px;
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.16);
+            border-radius: 10px;
+        }
+        .navbar .logo .logo-sub {
+            font-weight: 400;
+            font-size: 12px;
+            opacity: 0.75;
+            margin-left: 2px;
+        }
+        .navbar .nav-links { display: flex; gap: 8px; align-items: center; }
+        .navbar .nav-status {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 12.5px;
+            color: rgba(255,255,255,0.85);
+            background: rgba(255,255,255,0.12);
+            padding: 6px 14px;
+            border-radius: 20px;
+        }
+        .navbar .nav-status .dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #34D399;
+            box-shadow: 0 0 0 3px rgba(52,211,153,0.25);
+        }
         .navbar .nav-btn {
             background: rgba(255,255,255,0.15);
             border: none;
@@ -78,120 +144,161 @@
 
         /* 侧边栏 */
         .sidebar {
-            width: 320px;
+            width: 300px;
             background: var(--bg-card);
-            border-right: 1px solid var(--border);
+            border-right: 1px solid var(--border-soft);
             display: flex;
             flex-direction: column;
             overflow-y: auto;
         }
         .sidebar-section {
-            padding: 16px;
-            border-bottom: 1px solid var(--border);
+            padding: 18px 16px;
+            border-bottom: 1px solid var(--border-soft);
         }
         .sidebar-section h3 {
-            font-size: 14px;
-            color: var(--text-light);
+            font-size: 11.5px;
+            color: var(--text-faint);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
+            font-weight: 700;
             margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         /* 学生信息展示区 */
         .student-info-display {
-            background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+            background: var(--gradient-brand);
             border-radius: var(--radius);
             padding: 16px;
             margin-bottom: 12px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-glow);
+        }
+        .student-info-display::before {
+            content: "";
+            position: absolute;
+            width: 120px; height: 120px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 50%;
+            top: -50px; right: -30px;
+        }
+        .student-info-display .student-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 15px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(255,255,255,0.3);
         }
         .student-info-display .student-name {
-            font-size: 18px;
+            font-size: 17px;
             font-weight: 700;
-            color: var(--primary-dark);
-            margin-bottom: 4px;
+            color: #fff;
+            margin-bottom: 3px;
+            position: relative;
         }
         .student-info-display .student-details {
-            font-size: 13px;
-            color: var(--text-light);
-            margin-bottom: 8px;
+            font-size: 12.5px;
+            color: rgba(255,255,255,0.75);
+            margin-bottom: 10px;
+            position: relative;
         }
         .student-info-display .logout-btn {
-            background: var(--danger);
-            color: white;
-            border: none;
-            padding: 6px 12px;
+            background: rgba(255,255,255,0.14);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 7px 12px;
             border-radius: var(--radius-sm);
             cursor: pointer;
             font-size: 12px;
             width: 100%;
-            margin-top: 8px;
+            margin-top: 4px;
+            transition: all 0.2s;
+            position: relative;
         }
         .student-info-display .logout-btn:hover {
-            background: #DC2626;
+            background: rgba(255,255,255,0.24);
         }
 
         /* 学习进度展示 */
         .progress-section {
-            background: #F0F9FF;
+            background: var(--bg-sunken);
+            border: 1px solid var(--border-soft);
             border-radius: var(--radius);
-            padding: 12px;
+            padding: 14px;
             margin-top: 12px;
         }
         .progress-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 8px;
-            font-size: 13px;
+            margin-bottom: 10px;
+            font-size: 12.5px;
+            color: var(--text-light);
         }
+        .progress-item:last-child { margin-bottom: 0; }
         .progress-bar {
             flex: 1;
             height: 6px;
-            background: #E0E7FF;
+            background: var(--border);
             border-radius: 3px;
-            margin: 0 8px;
+            margin: 0 10px;
             overflow: hidden;
         }
         .progress-fill {
             height: 100%;
-            background: var(--success);
+            background: linear-gradient(90deg, var(--secondary), var(--success));
             border-radius: 3px;
-            transition: width 0.5s;
+            transition: width 0.6s ease;
         }
 
         .btn {
-            padding: 8px 16px;
+            padding: 9px 16px;
             border: none;
             border-radius: var(--radius-sm);
             cursor: pointer;
             font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s;
+            font-weight: 600;
+            transition: all 0.18s ease;
         }
+        .btn:active { transform: scale(0.97); }
         .btn-primary {
-            background: var(--primary);
+            background: var(--gradient-brand);
             color: white;
+            box-shadow: 0 4px 12px -3px rgba(67,56,202,0.4);
         }
-        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-primary:hover { filter: brightness(1.08); transform: translateY(-1px); }
         .btn-secondary {
-            background: var(--bg);
+            background: var(--bg-card);
             color: var(--text);
             border: 1px solid var(--border);
         }
-        .btn-secondary:hover { background: var(--border); }
+        .btn-secondary:hover { background: var(--bg-sunken); border-color: var(--primary-light); }
         .btn-success {
             background: var(--success);
             color: white;
         }
+        .btn-success:hover { filter: brightness(1.08); }
         .btn-accent {
             background: var(--accent);
             color: white;
         }
-        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        .btn-accent:hover { filter: brightness(1.08); }
+        .btn-sm { padding: 6px 12px; font-size: 12.5px; }
 
         /* 画像卡片 */
         .profile-card {
-            background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+            background: var(--primary-soft);
+            border: 1px solid #E0E4FF;
             border-radius: var(--radius);
             padding: 16px;
             margin-top: 12px;
@@ -285,7 +392,7 @@
             background: var(--bg);
         }
         .conv-item.active {
-            background: #EEF2FF;
+            background: var(--primary-soft);
             border: 1px solid #C7D2FE;
         }
         .conv-item .conv-icon {
@@ -383,25 +490,30 @@
         }
         .content-tabs {
             display: flex;
-            border-bottom: 2px solid var(--border);
-            padding: 0 16px;
+            gap: 4px;
+            padding: 10px 20px;
             background: var(--bg-card);
+            border-bottom: 1px solid var(--border-soft);
         }
         .content-tab {
-            padding: 12px 20px;
+            padding: 9px 18px;
             border: none;
             background: none;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13.5px;
+            font-weight: 500;
             color: var(--text-light);
-            border-bottom: 2px solid transparent;
-            margin-bottom: -2px;
+            border-radius: 10px;
             transition: all 0.2s;
+        }
+        .content-tab:hover {
+            background: var(--bg-sunken);
+            color: var(--text);
         }
         .content-tab.active {
             color: var(--primary);
-            border-bottom-color: var(--primary);
-            font-weight: 600;
+            background: var(--primary-soft);
+            font-weight: 700;
         }
 
         /* 聊天区 */
@@ -414,61 +526,81 @@
         .chat-messages {
             flex: 1;
             overflow-y: auto;
-            padding: 20px;
+            padding: 24px 28px;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 18px;
+            background: var(--bg-sunken);
         }
         .chat-message {
             display: flex;
-            gap: 12px;
-            max-width: 80%;
+            gap: 10px;
+            max-width: 78%;
+            animation: fadeInUp 0.25s ease;
         }
         .chat-message.user { align-self: flex-end; flex-direction: row-reverse; }
         .chat-message.assistant { align-self: flex-start; }
         .chat-avatar {
-            width: 36px;
-            height: 36px;
+            width: 34px;
+            height: 34px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
+            font-size: 16px;
             flex-shrink: 0;
+            box-shadow: var(--shadow-xs);
         }
-        .chat-message.user .chat-avatar { background: var(--primary); color: white; }
-        .chat-message.assistant .chat-avatar { background: var(--secondary); color: white; }
+        .chat-message.user .chat-avatar { background: var(--gradient-brand); color: white; }
+        .chat-message.assistant .chat-avatar { background: linear-gradient(135deg, #0891B2, #0EA5E9); color: white; }
         .chat-bubble {
             background: var(--bg-card);
             padding: 12px 16px;
             border-radius: var(--radius);
+            border-top-left-radius: 4px;
             box-shadow: var(--shadow);
             font-size: 14px;
-            line-height: 1.7;
+            line-height: 1.75;
             word-break: break-word;
         }
         .chat-message.user .chat-bubble {
-            background: var(--primary);
+            background: var(--gradient-brand);
             color: white;
+            border-top-left-radius: var(--radius);
+            border-top-right-radius: 4px;
+            box-shadow: 0 4px 12px -3px rgba(67,56,202,0.35);
         }
         .chat-input-area {
-            padding: 16px;
+            padding: 16px 20px;
             background: var(--bg-card);
-            border-top: 1px solid var(--border);
+            border-top: 1px solid var(--border-soft);
             display: flex;
-            gap: 8px;
+            gap: 10px;
         }
         .chat-input-area input {
             flex: 1;
-            padding: 10px 16px;
-            border: 1px solid var(--border);
+            padding: 12px 18px;
+            border: 1.5px solid var(--border);
+            background: var(--bg-sunken);
             border-radius: 24px;
             font-size: 14px;
             outline: none;
+            transition: all 0.2s;
         }
-        .chat-input-area input:focus { border-color: var(--primary); }
+        .chat-input-area input:focus {
+            border-color: var(--primary-light);
+            background: var(--bg-card);
+            box-shadow: 0 0 0 3px var(--primary-soft);
+        }
+        .chat-input-area select {
+            border-radius: 20px !important;
+            border: 1.5px solid var(--border) !important;
+            font-size: 13px !important;
+            color: var(--text-light);
+            background: var(--bg-sunken);
+        }
         .chat-input-area button {
-            padding: 10px 20px;
+            padding: 10px 22px;
             border-radius: 24px;
         }
 
@@ -705,7 +837,8 @@
         .auth-modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.7);
+            background: rgba(16,18,38,0.65);
+            backdrop-filter: blur(3px);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -713,63 +846,84 @@
         }
         .auth-modal {
             background: var(--bg-card);
-            border-radius: var(--radius);
-            padding: 32px;
+            border-radius: var(--radius-lg);
+            padding: 36px 32px;
             width: 400px;
             max-width: 90vw;
-            box-shadow: var(--shadow-lg);
+            box-shadow: 0 30px 60px -12px rgba(16,18,38,0.35);
+            animation: fadeInUp 0.3s ease;
         }
         .auth-modal h2 {
             text-align: center;
+            margin-bottom: 6px;
+            font-size: 21px;
+            font-weight: 800;
+            background: var(--gradient-brand);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .auth-modal .auth-subtitle {
+            text-align: center;
+            color: var(--text-light);
+            font-size: 12.5px;
             margin-bottom: 24px;
-            color: var(--primary);
         }
         .auth-form {
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 14px;
         }
         .auth-form input {
             padding: 12px 16px;
-            border: 1px solid var(--border);
+            border: 1.5px solid var(--border);
+            background: var(--bg-sunken);
             border-radius: var(--radius-sm);
             font-size: 14px;
             outline: none;
-            transition: border-color 0.2s;
+            transition: all 0.2s;
         }
         .auth-form input:focus {
-            border-color: var(--primary);
+            border-color: var(--primary-light);
+            background: var(--bg-card);
+            box-shadow: 0 0 0 3px var(--primary-soft);
         }
         .auth-form button {
             padding: 12px;
             border: none;
             border-radius: var(--radius-sm);
             cursor: pointer;
-            font-size: 16px;
-            font-weight: 600;
+            font-size: 15px;
+            font-weight: 700;
             transition: all 0.2s;
+            margin-top: 4px;
         }
         .auth-tabs {
             display: flex;
-            margin-bottom: 24px;
-            border-bottom: 2px solid var(--border);
+            margin-bottom: 20px;
+            background: var(--bg-sunken);
+            border-radius: var(--radius-sm);
+            padding: 4px;
+            gap: 4px;
         }
         .auth-tab {
             flex: 1;
-            padding: 12px;
+            padding: 10px;
             text-align: center;
             background: none;
             border: none;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 14px;
             color: var(--text-light);
-            border-bottom: 2px solid transparent;
-            margin-bottom: -2px;
+            font-weight: 500;
+            transition: all 0.2s;
         }
         .auth-tab.active {
             color: var(--primary);
-            border-bottom-color: var(--primary);
-            font-weight: 600;
+            background: var(--bg-card);
+            font-weight: 700;
+            box-shadow: var(--shadow-xs);
         }
 
         /* 模态框 */
@@ -867,14 +1021,15 @@
         /* 快速操作按钮 */
         .quick-actions {
             display: flex;
-            flex-wrap: wrap;
+            flex-direction: column;
             gap: 8px;
-            padding: 16px;
         }
         .quick-action-btn {
-            padding: 8px 14px;
-            border-radius: 20px;
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
             font-size: 13px;
+            text-align: left;
+            width: 100%;
         }
 
         /* 响应式 */
@@ -915,6 +1070,7 @@
     <div class="auth-modal-overlay" id="authModal">
         <div class="auth-modal">
             <h2>🎓 智能学习系统</h2>
+            <p class="auth-subtitle">高等教育个性化学习资源智能体系统</p>
             <div class="auth-tabs">
                 <button class="auth-tab active" onclick="switchAuthTab('login')">登录</button>
                 <button class="auth-tab" onclick="switchAuthTab('register')">注册</button>
@@ -942,14 +1098,10 @@
     <nav class="navbar">
         <div class="logo">
             <span class="icon">🎓</span>
-            <span>智能学习系统</span>
+            <span>智能学习系统<span class="logo-sub">· 高等教育个性化学习资源智能体</span></span>
         </div>
         <div class="nav-links">
-            <button class="nav-btn active" onclick="switchTab('chat')">💬 对话</button>
-            <button class="nav-btn" onclick="switchTab('profile')">🧠 学习画像</button>
-            <button class="nav-btn" onclick="switchTab('resources')">📚 资源</button>
-            <button class="nav-btn" onclick="switchTab('path')">🗺️ 学习路径</button>
-            <button class="nav-btn" onclick="switchTab('evaluation')">📊 评估</button>
+            <span class="nav-status"><span class="dot"></span>智能体在线</span>
         </div>
     </nav>
 
@@ -960,6 +1112,7 @@
             <div class="sidebar-section">
                 <h3>👤 学生信息</h3>
                 <div id="studentInfoDisplay" class="student-info-display" style="display:none;">
+                    <div class="student-avatar" id="displayStudentAvatar">学</div>
                     <div class="student-name" id="displayStudentName">加载中...</div>
                     <div class="student-details" id="displayStudentDetails">加载中...</div>
                     <button class="logout-btn" onclick="logout()">🚪 退出登录</button>
@@ -1260,6 +1413,8 @@
         function displayStudentInfo(student) {
             document.getElementById('studentInfoDisplay').style.display = 'block';
             document.getElementById('displayStudentName').textContent = student.name || '未知';
+            const avatarEl = document.getElementById('displayStudentAvatar');
+            if (avatarEl) avatarEl.textContent = (student.name || '未').trim().slice(0, 1);
             
             let details = '';
             if (student.major) details += student.major + ' ';
