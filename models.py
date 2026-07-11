@@ -4,6 +4,7 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from sqlalchemy import Column, Integer, String, Float, Text, DateTime, JSON, ForeignKey, Boolean
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from config import settings
@@ -33,6 +34,7 @@ class Student(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     student_id = Column(String(50), unique=True, nullable=False, index=True)
     name = Column(String(100), nullable=False)
+    password_hash = Column(String(256), nullable=True)  # 可为空以兼容旧数据
     major = Column(String(200))                    # 专业
     grade = Column(String(20))                     # 年级
     university = Column(String(200))               # 学校
@@ -244,9 +246,17 @@ class EvaluationResult(Base):
 
 
 async def init_db():
-    """初始化数据库"""
+    """初始化数据库（自动创建表并迁移新增列）"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    
+    # 自动迁移：如果已存在的表缺少新增列，静默添加
+    async with engine.begin() as conn:
+        try:
+            await conn.execute(text("ALTER TABLE students ADD COLUMN password_hash VARCHAR(256)"))
+            print("[数据库] 已迁移：students 表新增 password_hash 列")
+        except Exception:
+            pass  # 列已存在，忽略
     
     # 打印数据库路径信息，方便协作者确认
     import os
