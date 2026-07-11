@@ -6,7 +6,7 @@ from openai import AsyncOpenAI
 import asyncio
 import json
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional, TypedDict, Annotated
+from typing import Dict, List, Any, Optional, TypedDict, Annotated, Callable, Awaitable
 from datetime import datetime
 import operator
 
@@ -1584,8 +1584,14 @@ class MultiAgentSystem:
     
     async def generate_all_resources(self, subject: str, topic: str,
                                       profile: Dict[str, Any],
-                                      student_id: str = None) -> Dict[str, Any]:
-        """一键并行生成所有类型的学习资源"""
+                                      student_id: str = None,
+                                      progress_callback: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None) -> Dict[str, Any]:
+        """一键并行生成所有类型的学习资源
+
+        progress_callback: 可选的异步回调，签名为 async def cb(event: dict)。
+        会在每个资源智能体「开始执行」和「执行完成/失败」时各调用一次，
+        用于向前端推送实时进度（避免长时间静默导致用户以为卡住）。
+        """
 
         task_params = {
             "subject": subject,
@@ -1601,6 +1607,13 @@ class MultiAgentSystem:
             ("code_agent", {"subject": subject, "topic": topic, "language": "python"}),
             ("ppt_slides_agent", {"subject": subject, "topic": topic, "difficulty": "intermediate"}),
         ]
+
+        async def report(event: Dict[str, Any]):
+            if progress_callback:
+                try:
+                    await progress_callback(event)
+                except Exception as e:
+                    print(f"[进度回调失败] {e}")
 
         state = {
             "student_id": student_id,
@@ -1624,6 +1637,7 @@ class MultiAgentSystem:
             """并行执行单个智能体，带超时与异常处理。返回 (resources, failure_info_or_None) """
             agent = self.agents[agent_name]
             agent_state = {**state, "task_params": params}
+            await report({"event": "agent_start", "agent": agent_name})
             try:
                 print(f"[资源生成] 开始调用 {agent_name} ...")
                 # 对每个 agent.process 添加超时保护
@@ -1632,6 +1646,10 @@ class MultiAgentSystem:
                 print(f"[资源生成] {agent_name} 生成完成，产出 {len(resources)} 个资源")
                 for r in resources:
                     print(f"  - 类型: {r.get('type', 'unknown')}, 标题: {r.get('title', '无标题')[:40]}")
+                await report({
+                    "event": "agent_done", "agent": agent_name, "success": True,
+                    "titles": [r.get("title", "") for r in resources]
+                })
                 return resources, None
             except asyncio.TimeoutError as e:
                 # 超时视作失败，返回空资源并记录错误信息
@@ -1639,6 +1657,7 @@ class MultiAgentSystem:
                 print(f"[警告] 智能体 {agent_name} 超时: {err_msg}")
                 import traceback
                 traceback.print_exc()
+                await report({"event": "agent_done", "agent": agent_name, "success": False, "error": err_msg})
                 return [], {"agent": agent_name, "error": err_msg}
             except Exception as e:
                 # 捕获其他异常，返回空资源并记录错误信息
@@ -1646,6 +1665,7 @@ class MultiAgentSystem:
                 print(f"[警告] 智能体 {agent_name} 生成失败: {err_msg}")
                 import traceback
                 traceback.print_exc()
+                await report({"event": "agent_done", "agent": agent_name, "success": False, "error": err_msg})
                 return [], {"agent": agent_name, "error": err_msg}
 
         # 真正并行执行所有资源生成智能体，使用 return_exceptions=True
@@ -1686,6 +1706,7 @@ class MultiAgentSystem:
             all_resources.append(default_resource)
 
         # 生成学习路径（依赖资源生成结果，必须串行）
+        await report({"event": "agent_start", "agent": "path_agent"})
         path_params = {
             "subject": subject,
             "topic": topic,
@@ -1697,6 +1718,7 @@ class MultiAgentSystem:
         }
         path_state = {**state, "task_params": path_params, "generated_resources": all_resources}
         path_result = await self.agents["path_agent"].process(path_state)
+        await report({"event": "agent_done", "agent": "path_agent", "success": True})
 
         return {
             "resources": all_resources,

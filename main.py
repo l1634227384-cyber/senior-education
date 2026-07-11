@@ -709,8 +709,42 @@ async def generate_resources_stream(student_id: str, subject: str, topic: str, c
             yield f"data: {json.dumps({'type': 'thinking_done'})}\n\n"
 
             # 2) 后端实际生成并保存资源（与原 /api/resources/generate 行为一致）
+            #    这一步会并行调用 6+1 个智能体，耗时可能较长（数十秒），
+            #    因此改为后台任务 + 进度队列的方式，边生成边把每个智能体的完成情况推送给前端，
+            #    避免长时间静默让用户以为卡住了。
             yield f"data: {json.dumps({'type': 'generation_start', 'message': '开始在后端生成并保存资源'})}\n\n"
-            result = await multi_agent_system.generate_all_resources(subject=subject, topic=topic, profile=profile_dict, student_id=student_id)
+
+            AGENT_LABELS = {
+                "content_agent": "课程讲解", "exercise_agent": "练习题",
+                "mindmap_agent": "思维导图", "reading_agent": "拓展阅读",
+                "code_agent": "代码实操", "ppt_slides_agent": "课件讲义",
+                "path_agent": "学习路径规划"
+            }
+
+            progress_queue: asyncio.Queue = asyncio.Queue()
+
+            async def on_agent_progress(event: dict):
+                agent_name = event.get("agent", "")
+                event["label"] = AGENT_LABELS.get(agent_name, agent_name)
+                await progress_queue.put(event)
+
+            gen_task = asyncio.create_task(
+                multi_agent_system.generate_all_resources(
+                    subject=subject, topic=topic, profile=profile_dict,
+                    student_id=student_id, progress_callback=on_agent_progress
+                )
+            )
+
+            # 边等待后台任务完成，边把进度队列里的事件转发给前端
+            while not gen_task.done() or not progress_queue.empty():
+                try:
+                    item = await asyncio.wait_for(progress_queue.get(), timeout=0.5)
+                    ev = {"type": "resource_progress", **item}
+                    yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+                except asyncio.TimeoutError:
+                    continue
+
+            result = await gen_task
             resources = result.get('resources', [])
             learning_path_data = result.get('learning_path')
 
