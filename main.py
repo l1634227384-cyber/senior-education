@@ -181,7 +181,7 @@ async def startup():
     """应用启动"""
     await init_db()
     print(f"{settings.PROJECT_NAME} v{settings.PROJECT_VERSION} 启动成功")
-    print(f"访问地址: https://localhost:8000")
+    print(f"访问地址: http://localhost:8000")
 
 
 @app.get("/", response_class=HTMLResponse)

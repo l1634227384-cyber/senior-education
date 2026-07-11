@@ -908,6 +908,68 @@
         .markdown-content ul, .markdown-content ol {
             padding-left: 20px;
         }
+
+        /* 通知弹窗 —— 页面正中 */
+        .notify-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.25s, visibility 0.25s;
+        }
+        .notify-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .notify-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 36px 44px 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            transform: translateY(16px) scale(0.96);
+            transition: transform 0.25s;
+        }
+        .notify-overlay.show .notify-card {
+            transform: translateY(0) scale(1);
+        }
+        .notify-icon {
+            font-size: 44px;
+            margin-bottom: 10px;
+            display: block;
+            line-height: 1;
+        }
+        .notify-msg {
+            font-size: 15px;
+            color: var(--text);
+            line-height: 1.7;
+            white-space: pre-wrap;
+        }
+        .notify-btn {
+            margin-top: 20px;
+            padding: 8px 36px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .notify-btn.info    { background: var(--primary); color: #fff; }
+        .notify-btn.info:hover    { background: var(--primary-dark); }
+        .notify-btn.success { background: var(--success); color: #fff; }
+        .notify-btn.success:hover { background: #059669; }
+        .notify-btn.warning { background: var(--accent); color: #fff; }
+        .notify-btn.warning:hover { background: #D97706; }
+        .notify-btn.error   { background: var(--danger); color: #fff; }
+        .notify-btn.error:hover   { background: #DC2626; }
     </style>
 </head>
 <body>
@@ -1116,6 +1178,27 @@
         </div>
     </div>
 
+    <!-- 通知弹窗 -->
+    <div class="notify-overlay" id="notifyOverlay">
+        <div class="notify-card">
+            <span class="notify-icon" id="notifyIcon"></span>
+            <div class="notify-msg" id="notifyMsg"></div>
+            <button class="notify-btn" id="notifyBtn" onclick="dismissNotify()">确定</button>
+        </div>
+    </div>
+
+    <!-- 确认弹窗 -->
+    <div class="notify-overlay" id="confirmOverlay">
+        <div class="notify-card">
+            <span class="notify-icon" id="confirmIcon"></span>
+            <div class="notify-msg" id="confirmMsg"></div>
+            <div style="display:flex;gap:12px;justify-content:center;margin-top:20px;">
+                <button class="notify-btn" id="confirmCancelBtn" onclick="dismissConfirm(false)" style="background:#6B7280;color:#fff;">取消</button>
+                <button class="notify-btn error" id="confirmOkBtn" onclick="dismissConfirm(true)">确定</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 加载指示器 -->
     <div class="modal-overlay" id="loadingOverlay" style="display:none;">
         <div class="loading" style="background:var(--bg-card);padding:24px;border-radius:var(--radius);box-shadow:var(--shadow-lg);">
@@ -1157,6 +1240,53 @@
             document.getElementById('loadingOverlay').style.display = 'none';
         }
 
+        // 通知弹窗 —— 页面正中显示
+        let _notifyResolve = null;
+        function showNotify(message, type = 'info') {
+            return new Promise(resolve => {
+                _notifyResolve = resolve;
+                const overlay = document.getElementById('notifyOverlay');
+                const icon = document.getElementById('notifyIcon');
+                const msg = document.getElementById('notifyMsg');
+                const btn = document.getElementById('notifyBtn');
+                const icons = { success: '✅', error: '❌', warning: '⚠️', info: '💡' };
+                icon.textContent = icons[type] || icons.info;
+                // 如果消息本身已含 emoji 前缀就不重复加 icon
+                if (/^[✅❌⚠️🎉💡]/.test(message.trim())) {
+                    icon.textContent = '';
+                }
+                msg.textContent = message;
+                btn.className = 'notify-btn ' + type;
+                overlay.classList.add('show');
+                // 3 秒后自动关闭
+                clearTimeout(window._notifyTimer);
+                window._notifyTimer = setTimeout(() => dismissNotify(), 2500);
+            });
+        }
+        function dismissNotify() {
+            clearTimeout(window._notifyTimer);
+            document.getElementById('notifyOverlay').classList.remove('show');
+            if (_notifyResolve) { _notifyResolve(); _notifyResolve = null; }
+        }
+
+        // 确认弹窗 —— 页面正中，两个按钮
+        let _confirmResolve = null;
+        function showConfirm(message) {
+            return new Promise(resolve => {
+                _confirmResolve = resolve;
+                const overlay = document.getElementById('confirmOverlay');
+                const icon = document.getElementById('confirmIcon');
+                const msg = document.getElementById('confirmMsg');
+                icon.textContent = '⚠️';
+                msg.textContent = message;
+                overlay.classList.add('show');
+            });
+        }
+        function dismissConfirm(result) {
+            document.getElementById('confirmOverlay').classList.remove('show');
+            if (_confirmResolve) { _confirmResolve(result); _confirmResolve = null; }
+        }
+
         // 注册学生
         async function registerStudent() {
             const studentId = document.getElementById('registerStudentId').value.trim();
@@ -1165,7 +1295,7 @@
             const grade = document.getElementById('registerStudentGrade').value.trim();
 
             if (!studentId || !name) {
-                alert('请填写学号和姓名');
+                showNotify('请填写学号和姓名', 'warning');
                 return;
             }
 
@@ -1178,12 +1308,12 @@
                 });
                 const data = await resp.json();
                 if (!resp.ok) {
-                    alert('❌ ' + (data.detail || '注册失败'));
+                    showNotify('❌ ' + (data.detail || '注册失败'), 'error');
                     return;
                 }
 
                 currentStudentId = studentId;
-                alert(`✅ 学生 ${name} 注册成功！`);
+                showNotify(`✅ 学生 ${name} 注册成功！`, 'success');
                 
                 // 隐藏登录模态框
                 document.getElementById('authModal').style.display = 'none';
@@ -1201,7 +1331,7 @@
                 await loadLearningProgress();
                 await loadConversationList();
             } catch (err) {
-                alert('注册失败: ' + err.message);
+                showNotify('注册失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -1213,7 +1343,7 @@
             const name = document.getElementById('loginStudentName').value.trim();
 
             if (!studentId || !name) {
-                alert('请填写学号和姓名');
+                showNotify('请填写学号和姓名', 'warning');
                 return;
             }
 
@@ -1226,7 +1356,7 @@
                 });
                 const data = await resp.json();
                 if (!resp.ok) {
-                    alert('❌ ' + (data.detail || '登录失败'));
+                    showNotify('❌ ' + (data.detail || '登录失败'), 'error');
                     return;
                 }
 
@@ -1238,7 +1368,7 @@
                 // 显示学生信息
                 displayStudentInfo(data.student);
                 
-                alert(`✅ 欢迎回来，${data.student.name}！`);
+                showNotify(`✅ 欢迎回来，${data.student.name}！`, 'success');
 
                 // 建立 WebSocket 连接
                 connectWebSocket(studentId);
@@ -1250,7 +1380,7 @@
                 await loadLearningProgress();
                 await loadConversationList();
             } catch (err) {
-                alert('登录失败: ' + err.message);
+                showNotify('登录失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -1272,8 +1402,8 @@
         }
 
         // 退出登录
-        function logout() {
-            if (confirm('确定要退出登录吗？')) {
+        async function logout() {
+            if (await showConfirm('确定要退出登录吗？')) {
                 currentStudentId = null;
                 currentProfile = null;
                 allResources = [];
@@ -1786,7 +1916,7 @@
             
             if (!message) return;
             if (!currentStudentId) {
-                alert('请先登录');
+                showNotify('请先登录', 'warning');
                 document.getElementById('authModal').style.display = 'flex';
                 return;
             }
@@ -2150,7 +2280,7 @@
 
                 modal.style.display = 'flex';
             } catch (err) {
-                alert('加载资源失败: ' + err.message);
+                showNotify('加载资源失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -2214,7 +2344,7 @@
                 });
                 const data = await resp.json();
                 if (!resp.ok) {
-                    alert('批阅失败: ' + (data.detail || '未知错误'));
+                    showNotify('批阅失败: ' + (data.detail || '未知错误'), 'error');
                     return;
                 }
 
@@ -2244,12 +2374,12 @@
 
                 // 根据成绩更新画像（如果得分率较低，标记薄弱知识点）
                 if (result.score_rate < 60) {
-                    alert('⚠️ 本次练习得分率较低，建议重新学习相关知识点后再练习。');
+                    showNotify('⚠️ 本次练习得分率较低，建议重新学习相关知识点后再练习。', 'warning');
                 } else if (result.score_rate >= 90) {
-                    alert('🎉 恭喜！本次练习表现优秀！');
+                    showNotify('🎉 恭喜！本次练习表现优秀！', 'success');
                 }
             } catch (err) {
-                alert('批阅失败: ' + err.message);
+                showNotify('批阅失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -2289,7 +2419,7 @@
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             } catch (err) {
-                alert('导出失败: ' + err.message);
+                showNotify('导出失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -2465,10 +2595,10 @@
                         rating: rating
                     })
                 });
-                alert('✅ 感谢你的反馈！');
+                showNotify('✅ 感谢你的反馈！', 'success');
                 document.getElementById('resourceModal').style.display = 'none';
             } catch (err) {
-                alert('反馈提交失败');
+                showNotify('反馈提交失败', 'error');
             }
         }
 
@@ -2591,7 +2721,7 @@
             try {
                 const resp = await fetch(`/api/students/${currentStudentId}/conversation/${convId}`);
                 if (!resp.ok) {
-                    alert('对话加载失败');
+                    showNotify('对话加载失败', 'error');
                     return;
                 }
                 const data = await resp.json();
@@ -2627,7 +2757,7 @@
                 // 切换到对话标签
                 switchTab('chat');
             } catch (err) {
-                alert('加载对话失败: ' + err.message);
+                showNotify('加载对话失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -2636,7 +2766,7 @@
         // 创建新对话
         async function createNewConversation() {
             if (!currentStudentId) {
-                alert('请先登录');
+                showNotify('请先登录', 'warning');
                 return;
             }
 
@@ -2647,7 +2777,7 @@
                 });
                 const data = await resp.json();
                 if (!resp.ok) {
-                    alert('创建失败');
+                    showNotify('创建失败', 'error');
                     return;
                 }
                 
@@ -2672,7 +2802,7 @@
                 // 切换到对话标签
                 switchTab('chat');
             } catch (err) {
-                alert('创建失败: ' + err.message);
+                showNotify('创建失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -2681,14 +2811,14 @@
         // 删除对话
         async function deleteConversation(convId) {
             if (!currentStudentId) return;
-            if (!confirm('确定要删除这个对话吗？此操作不可撤销。')) return;
+            if (!await showConfirm('确定要删除这个对话吗？此操作不可撤销。')) return;
 
             try {
                 const resp = await fetch(`/api/students/${currentStudentId}/conversation/${convId}`, {
                     method: 'DELETE'
                 });
                 if (!resp.ok) {
-                    alert('删除失败');
+                    showNotify('删除失败', 'error');
                     return;
                 }
                 
@@ -2711,7 +2841,7 @@
                 // 刷新对话列表
                 await loadConversationList();
             } catch (err) {
-                alert('删除失败: ' + err.message);
+                showNotify('删除失败: ' + err.message, 'error');
             }
         }
 
@@ -2736,7 +2866,7 @@
         // 快速生成资源
         async function quickGenerate() {
             if (!currentStudentId) {
-                alert('请先登录');
+                showNotify('请先登录', 'warning');
                 document.getElementById('authModal').style.display = 'flex';
                 return;
             }
@@ -2754,7 +2884,7 @@
         // 快速评估
         async function quickEvaluate() {
             if (!currentStudentId) {
-                alert('请先登录');
+                showNotify('请先登录', 'warning');
                 document.getElementById('authModal').style.display = 'flex';
                 return;
             }
@@ -2815,7 +2945,7 @@
                 container.innerHTML = html;
                 switchTab('evaluation');
             } catch (err) {
-                alert('评估失败: ' + err.message);
+                showNotify('评估失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -2824,7 +2954,7 @@
         // 快速规划路径
         async function quickPlanPath() {
             if (!currentStudentId) {
-                alert('请先登录');
+                showNotify('请先登录', 'warning');
                 document.getElementById('authModal').style.display = 'flex';
                 return;
             }
@@ -2843,7 +2973,7 @@
                     renderLearningPath();
                     switchTab('path');
                 } catch (err) {
-                    alert('路径规划失败: ' + err.message);
+                    showNotify('路径规划失败: ' + err.message, 'error');
                 } finally {
                     hideLoading();
                 }
