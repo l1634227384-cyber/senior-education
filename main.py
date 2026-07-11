@@ -2,10 +2,7 @@
 高等教育个性化学习资源智能体系统 - FastAPI 主应用
 """
 import asyncio
-import hashlib
-import hmac
 import json
-import os
 import uuid
 from datetime import datetime
 from typing import List, Optional, Dict, Any
@@ -17,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from config import settings
 from agents import multi_agent_system, LLMClient
@@ -50,16 +48,9 @@ class StudentCreateRequest(BaseModel):
     """创建学生请求"""
     name: str
     student_id: str
-    password: str
     major: Optional[str] = None
     grade: Optional[str] = None
     university: Optional[str] = None
-
-
-class StudentLoginRequest(BaseModel):
-    """登录请求"""
-    student_id: str
-    password: str
 
 
 class ChatMessage(BaseModel):
@@ -118,23 +109,6 @@ class ChatIntentRequest(BaseModel):
 
 
 # ==================== 工具函数 ====================
-
-def hash_password(password: str) -> str:
-    """使用 PBKDF2-HMAC-SHA256 哈希密码（salt 自动生成并拼入结果）"""
-    salt = hashlib.sha256(os.urandom(32)).hexdigest()[:32]
-    key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100000)
-    return salt + ':' + key.hex()
-
-
-def verify_password(password: str, stored_hash: str) -> bool:
-    """验证密码是否匹配"""
-    try:
-        salt, key_hex = stored_hash.split(':', 1)
-        key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100000)
-        return hmac.compare_digest(key.hex(), key_hex)
-    except Exception:
-        return False
-
 
 async def _get_student(db: AsyncSession, student_id: str) -> Student:
     """获取学生对象，不存在则抛 404"""
@@ -208,7 +182,7 @@ async def startup():
     """应用启动"""
     await init_db()
     print(f"{settings.PROJECT_NAME} v{settings.PROJECT_VERSION} 启动成功")
-    print(f"访问地址: http://localhost:8000")
+    print(f"访问地址: https://localhost:8000")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -228,13 +202,9 @@ async def register_student(request: StudentCreateRequest, db: AsyncSession = Dep
     if student:
         raise HTTPException(status_code=400, detail="该学号已注册，请直接登录")
 
-    if not request.password or len(request.password) < 4:
-        raise HTTPException(status_code=400, detail="密码至少需要4个字符")
-
     student = Student(
         student_id=request.student_id,
         name=request.name,
-        password_hash=hash_password(request.password),
         major=request.major,
         grade=request.grade,
         university=request.university
@@ -249,19 +219,23 @@ async def register_student(request: StudentCreateRequest, db: AsyncSession = Dep
     return {"status": "success", "student": student_to_dict(student)}
 
 
+class StudentLoginRequest(BaseModel):
+    """登录请求"""
+    student_id: str
+    name: str
+
+
 @app.post("/api/students/login")
 async def login_student(request: StudentLoginRequest, db: AsyncSession = Depends(get_db)):
-    """学生登录（验证学号和密码）"""
+    """学生登录（验证学号和姓名）"""
     result = await db.execute(
         select(Student).where(Student.student_id == request.student_id)
     )
     student = result.scalar_one_or_none()
     if not student:
         raise HTTPException(status_code=404, detail="学号不存在，请先注册")
-    if not student.password_hash:
-        raise HTTPException(status_code=403, detail="该账号尚未设置密码，请联系管理员")
-    if not verify_password(request.password, student.password_hash):
-        raise HTTPException(status_code=403, detail="密码错误")
+    if student.name != request.name:
+        raise HTTPException(status_code=403, detail="姓名与学号不匹配")
 
     return {"status": "success", "student": student_to_dict(student)}
 
@@ -658,15 +632,51 @@ async def generate_resources(request: ResourceGenerateRequest, db: AsyncSession 
 
 
 @app.get("/api/generate/stream")
-async def generate_resources_stream(student_id: str, subject: str, topic: str, db: AsyncSession = Depends(get_db)):
+async def generate_resources_stream(student_id: str, subject: str, topic: str, conversation_id: Optional[int] = None, db: AsyncSession = Depends(get_db)):
     """SSE 流式生成接口：先展示模型的思考过程(reasoning_content)，再触发后端实际资源生成并返回结果。
 
-    前端通过 EventSource 订阅本接口（GET），查询参数：student_id, subject, topic
+    前端通过 EventSource 订阅本接口（GET），查询参数：student_id, subject, topic, conversation_id(可选)
+    生成完成后，会将本次交互（用户请求 + 生成结果摘要）写入对话记录，保证「对话历史」可见、可追溯。
     """
     # 准备学生与画像
     student = await _get_student(db, student_id)
     profile = await _get_or_create_profile(db, student.id)
     profile_dict = profile_to_dict(profile)
+
+    # 解析/创建关联的对话记录，逻辑与 WebSocket 聊天保持一致
+    conv = None
+    if conversation_id:
+        conv_result = await db.execute(
+            select(Conversation).where(
+                Conversation.id == conversation_id,
+                Conversation.student_id == student.id
+            )
+        )
+        conv = conv_result.scalar_one_or_none()
+
+    if not conv:
+        conv_result = await db.execute(
+            select(Conversation).where(
+                Conversation.student_id == student.id,
+                Conversation.is_active == True
+            ).order_by(Conversation.updated_at.desc()).limit(1)
+        )
+        conv = conv_result.scalar_one_or_none()
+
+    if not conv:
+        conv = Conversation(
+            student_id=student.id,
+            session_id=str(uuid.uuid4()),
+            conversation_type="general",
+            title="新对话",
+            messages=[],
+            is_active=True
+        )
+        db.add(conv)
+        await db.commit()
+        await db.refresh(conv)
+
+    user_request_text = f"生成 {subject} {topic} 的学习资料"
 
     llm = LLMClient()
 
@@ -753,12 +763,41 @@ async def generate_resources_stream(student_id: str, subject: str, topic: str, d
 
             await db.commit()
 
+            # 3.5) 将本次生成交互写入对话记录，保证「对话历史」可见
+            try:
+                await db.refresh(conv)
+                messages = list(conv.messages) if conv.messages else []
+                messages.append({
+                    "role": "user", "content": user_request_text,
+                    "timestamp": datetime.now().isoformat()
+                })
+                summary_lines = "\n".join(f"- {r.get('title', '')}" for r in saved_resources)
+                assistant_text = f"已为你生成 {len(saved_resources)} 个个性化学习资源：\n\n{summary_lines}"
+                messages.append({
+                    "role": "assistant", "content": assistant_text,
+                    "timestamp": datetime.now().isoformat()
+                })
+
+                if not conv.title or conv.title == "新对话":
+                    conv.title = user_request_text[:30] + ("..." if len(user_request_text) > 30 else "")
+
+                conv.messages = messages
+                flag_modified(conv, "messages")
+                conv.updated_at = datetime.now()
+                conv.is_active = True
+                await db.commit()
+                await db.refresh(conv)
+            except Exception as e:
+                print(f"[SSE 保存对话记录失败] {e}")
+
             # 3) 推送最终结果
             final_ev = {
                 "type": "done",
                 "resources": saved_resources,
                 "learning_path": learning_path_data,
-                "total": len(saved_resources)
+                "total": len(saved_resources),
+                "conversation_id": conv.id if conv else None,
+                "conversation_title": conv.title if conv else "新对话"
             }
             yield f"data: {json.dumps(final_ev, ensure_ascii=False)}\n\n"
         except Exception as e:
@@ -797,21 +836,6 @@ async def get_resource(resource_id: str, db: AsyncSession = Depends(get_db)):
         "avg_rating": resource.avg_rating,
         "created_at": resource.created_at.isoformat() if resource.created_at else None
     }
-
-
-@app.delete("/api/resources/{resource_id}")
-async def delete_resource(resource_id: str, db: AsyncSession = Depends(get_db)):
-    """删除指定学习资源"""
-    result = await db.execute(
-        select(LearningResource).where(LearningResource.id == resource_id)
-    )
-    resource = result.scalar_one_or_none()
-    if not resource:
-        raise HTTPException(status_code=404, detail="资源不存在")
-
-    await db.delete(resource)
-    await db.commit()
-    return {"success": True, "message": "资源已删除"}
 
 
 @app.get("/api/students/{student_id}/resources")
@@ -1496,7 +1520,8 @@ async def websocket_chat(websocket: WebSocket, student_id: str):
                 # 保存对话
                 print("[WS 数据库] 正在保存对话记录到数据库...")
                 if conv:
-                    conv.messages = messages
+                    conv.messages = list(messages)  # 用新列表对象替换，避免原地修改导致ORM未检测到变更
+                    flag_modified(conv, "messages")  # 显式标记JSON字段已修改，确保SQLAlchemy写入
                     conv.updated_at = datetime.now()
                     conv.is_active = True
                 await db.commit()
