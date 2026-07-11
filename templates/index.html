@@ -620,6 +620,7 @@
             cursor: pointer;
             transition: all 0.2s;
             border: 1px solid var(--border);
+            position: relative;
         }
         .resource-card:hover {
             box-shadow: var(--shadow-lg);
@@ -645,6 +646,29 @@
             margin-right: 4px;
             background: #EEF2FF;
             color: var(--primary);
+        }
+
+        .resource-card .resource-delete {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            opacity: 0;
+            background: none;
+            border: none;
+            color: var(--text-light);
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: all 0.2s;
+            z-index: 2;
+        }
+        .resource-card:hover .resource-delete {
+            opacity: 1;
+        }
+        .resource-card .resource-delete:hover {
+            color: var(--danger);
+            background: #FEE2E2;
         }
 
         /* 路径视图 */
@@ -1040,7 +1064,17 @@
 
         /* Markdown内容样式 */
         .markdown-content h1, .markdown-content h2, .markdown-content h3 {
-            margin: 12px 0 8px;
+            margin: 20px 0 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+            color: var(--primary);
+        }
+        .markdown-content h1 { font-size: 20px; }
+        .markdown-content h2 { font-size: 17px; }
+        .markdown-content h3 { font-size: 15px; border-bottom: none; margin-top: 16px; }
+        .markdown-content p {
+            margin: 10px 0;
+            line-height: 1.8;
         }
         .markdown-content code {
             background: #F1F5F9;
@@ -1054,6 +1088,7 @@
             padding: 16px;
             border-radius: var(--radius-sm);
             overflow-x: auto;
+            margin: 12px 0;
         }
         .markdown-content pre code {
             background: none;
@@ -1062,7 +1097,89 @@
         }
         .markdown-content ul, .markdown-content ol {
             padding-left: 20px;
+            margin: 8px 0;
         }
+        .markdown-content li {
+            margin: 4px 0;
+        }
+        .markdown-content blockquote {
+            margin: 12px 0;
+            padding: 10px 14px;
+            border-left: 3px solid var(--primary);
+            background: #F8FAFC;
+            color: var(--text-light);
+            border-radius: 0 4px 4px 0;
+        }
+        .markdown-content hr {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 16px 0;
+        }
+        .markdown-content strong {
+            color: var(--text);
+        }
+
+        /* 通知弹窗 —— 页面正中 */
+        .notify-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.25s, visibility 0.25s;
+        }
+        .notify-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .notify-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 36px 44px 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            transform: translateY(16px) scale(0.96);
+            transition: transform 0.25s;
+        }
+        .notify-overlay.show .notify-card {
+            transform: translateY(0) scale(1);
+        }
+        .notify-icon {
+            font-size: 44px;
+            margin-bottom: 10px;
+            display: block;
+            line-height: 1;
+        }
+        .notify-msg {
+            font-size: 15px;
+            color: var(--text);
+            line-height: 1.7;
+            white-space: pre-wrap;
+        }
+        .notify-btn {
+            margin-top: 20px;
+            padding: 8px 36px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .notify-btn.info    { background: var(--primary); color: #fff; }
+        .notify-btn.info:hover    { background: var(--primary-dark); }
+        .notify-btn.success { background: var(--success); color: #fff; }
+        .notify-btn.success:hover { background: #059669; }
+        .notify-btn.warning { background: var(--accent); color: #fff; }
+        .notify-btn.warning:hover { background: #D97706; }
+        .notify-btn.error   { background: var(--danger); color: #fff; }
+        .notify-btn.error:hover   { background: #DC2626; }
     </style>
 </head>
 <body>
@@ -1079,7 +1196,7 @@
             <!-- 登录表单 -->
             <div id="loginForm" class="auth-form">
                 <input type="text" id="loginStudentId" placeholder="学号" autocomplete="username">
-                <input type="text" id="loginStudentName" placeholder="姓名" autocomplete="name">
+                <input type="password" id="loginPassword" placeholder="密码" autocomplete="current-password">
                 <button class="btn btn-primary" onclick="loginStudent()">登录</button>
             </div>
             
@@ -1087,6 +1204,7 @@
             <div id="registerForm" class="auth-form" style="display:none;">
                 <input type="text" id="registerStudentId" placeholder="学号" autocomplete="username">
                 <input type="text" id="registerStudentName" placeholder="姓名" autocomplete="name">
+                <input type="password" id="registerPassword" placeholder="密码（至少4位）" autocomplete="new-password">
                 <input type="text" id="registerStudentMajor" placeholder="专业（可选）">
                 <input type="text" id="registerStudentGrade" placeholder="年级（可选）">
                 <button class="btn btn-success" onclick="registerStudent()">注册</button>
@@ -1269,6 +1387,40 @@
         </div>
     </div>
 
+    <!-- 通知弹窗 -->
+    <div class="notify-overlay" id="notifyOverlay">
+        <div class="notify-card">
+            <span class="notify-icon" id="notifyIcon"></span>
+            <div class="notify-msg" id="notifyMsg"></div>
+            <button class="notify-btn" id="notifyBtn" onclick="dismissNotify()">确定</button>
+        </div>
+    </div>
+
+    <!-- 确认弹窗 -->
+    <div class="notify-overlay" id="confirmOverlay">
+        <div class="notify-card">
+            <span class="notify-icon" id="confirmIcon"></span>
+            <div class="notify-msg" id="confirmMsg"></div>
+            <div style="display:flex;gap:12px;justify-content:center;margin-top:20px;">
+                <button class="notify-btn" id="confirmCancelBtn" onclick="dismissConfirm(false)" style="background:#6B7280;color:#fff;">取消</button>
+                <button class="notify-btn error" id="confirmOkBtn" onclick="dismissConfirm(true)">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 输入弹窗 -->
+    <div class="notify-overlay" id="inputOverlay">
+        <div class="notify-card">
+            <span class="notify-icon" id="inputIcon">📝</span>
+            <div class="notify-msg" id="inputMsg"></div>
+            <input type="text" class="input-modal-field" id="inputField" placeholder="" style="width:100%;padding:12px 16px;border:2px solid var(--border);border-radius:8px;font-size:15px;margin-top:12px;outline:none;transition:border-color .2s;" autocomplete="off">
+            <div style="display:flex;gap:12px;justify-content:center;margin-top:16px;">
+                <button class="notify-btn" onclick="dismissInput(null)" style="background:#6B7280;color:#fff;">取消</button>
+                <button class="notify-btn" onclick="dismissInput(document.getElementById('inputField').value)" style="background:var(--primary);color:#fff;">确定</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 加载指示器 -->
     <div class="modal-overlay" id="loadingOverlay" style="display:none;">
         <div class="loading" style="background:var(--bg-card);padding:24px;border-radius:var(--radius);box-shadow:var(--shadow-lg);">
@@ -1310,15 +1462,97 @@
             document.getElementById('loadingOverlay').style.display = 'none';
         }
 
+        // 通知弹窗 —— 页面正中显示
+        let _notifyResolve = null;
+        function showNotify(message, type = 'info') {
+            return new Promise(resolve => {
+                _notifyResolve = resolve;
+                const overlay = document.getElementById('notifyOverlay');
+                const icon = document.getElementById('notifyIcon');
+                const msg = document.getElementById('notifyMsg');
+                const btn = document.getElementById('notifyBtn');
+                const icons = { success: '✅', error: '❌', warning: '⚠️', info: '💡' };
+                icon.textContent = icons[type] || icons.info;
+                // 如果消息本身已含 emoji 前缀就不重复加 icon
+                if (/^[✅❌⚠️🎉💡]/.test(message.trim())) {
+                    icon.textContent = '';
+                }
+                msg.textContent = message;
+                btn.className = 'notify-btn ' + type;
+                overlay.classList.add('show');
+                // 3 秒后自动关闭
+                clearTimeout(window._notifyTimer);
+                window._notifyTimer = setTimeout(() => dismissNotify(), 2500);
+            });
+        }
+        function dismissNotify() {
+            clearTimeout(window._notifyTimer);
+            document.getElementById('notifyOverlay').classList.remove('show');
+            if (_notifyResolve) { _notifyResolve(); _notifyResolve = null; }
+        }
+
+        // 确认弹窗 —— 页面正中，两个按钮
+        let _confirmResolve = null;
+        function showConfirm(message) {
+            return new Promise(resolve => {
+                _confirmResolve = resolve;
+                const overlay = document.getElementById('confirmOverlay');
+                const icon = document.getElementById('confirmIcon');
+                const msg = document.getElementById('confirmMsg');
+                icon.textContent = '⚠️';
+                msg.textContent = message;
+                overlay.classList.add('show');
+            });
+        }
+        function dismissConfirm(result) {
+            document.getElementById('confirmOverlay').classList.remove('show');
+            if (_confirmResolve) { _confirmResolve(result); _confirmResolve = null; }
+        }
+
+        // 输入弹窗 —— 页面正中，单行文本输入
+        let _inputResolve = null;
+        function showInput(label, defaultValue) {
+            return new Promise(resolve => {
+                _inputResolve = resolve;
+                const overlay = document.getElementById('inputOverlay');
+                const msg = document.getElementById('inputMsg');
+                const field = document.getElementById('inputField');
+                msg.textContent = label;
+                field.value = defaultValue || '';
+                field.placeholder = label;
+                overlay.classList.add('show');
+                // 自动聚焦并选中
+                setTimeout(() => { field.focus(); field.select(); }, 100);
+            });
+        }
+        function dismissInput(value) {
+            document.getElementById('inputOverlay').classList.remove('show');
+            if (_inputResolve) { _inputResolve(value); _inputResolve = null; }
+        }
+        // 输入弹窗支持回车确认
+        document.addEventListener('DOMContentLoaded', () => {
+            const inputField = document.getElementById('inputField');
+            if (inputField) {
+                inputField.addEventListener('keydown', e => {
+                    if (e.key === 'Enter') dismissInput(inputField.value);
+                });
+            }
+        });
+
         // 注册学生
         async function registerStudent() {
             const studentId = document.getElementById('registerStudentId').value.trim();
             const name = document.getElementById('registerStudentName').value.trim();
+            const password = document.getElementById('registerPassword').value;
             const major = document.getElementById('registerStudentMajor').value.trim();
             const grade = document.getElementById('registerStudentGrade').value.trim();
 
-            if (!studentId || !name) {
-                alert('请填写学号和姓名');
+            if (!studentId || !name || !password) {
+                showNotify('请填写学号、姓名和密码', 'warning');
+                return;
+            }
+            if (password.length < 4) {
+                showNotify('密码至少需要4个字符', 'warning');
                 return;
             }
 
@@ -1327,16 +1561,30 @@
                 const resp = await fetch('/api/students/register', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({student_id: studentId, name, major, grade})
+                    body: JSON.stringify({student_id: studentId, name, password, major, grade})
                 });
-                const data = await resp.json();
+                // 先安全解析 JSON，防止遇到非 JSON 响应时崩溃
+                let data = {};
+                try { data = await resp.json(); } catch (_) { /* ignore */ }
                 if (!resp.ok) {
-                    alert('❌ ' + (data.detail || '注册失败'));
+                    const rawDetail = data.detail || '';
+                    // 把常见技术错误翻译成中文
+                    let errMsg = rawDetail || '服务器返回未知错误';
+                    if (typeof errMsg === 'string') {
+                        if (errMsg.includes('no such column') && errMsg.includes('password_hash')) {
+                            errMsg = '系统正在升级中，请刷新页面后重试';
+                        } else if (errMsg.includes('IntegrityError') || errMsg.includes('UNIQUE')) {
+                            errMsg = '该学号已被注册，请直接登录';
+                        } else if (errMsg.includes('Internal Server Error') || errMsg.includes('500')) {
+                            errMsg = '服务器内部错误，请稍后重试';
+                        }
+                    }
+                    showNotify(errMsg, 'error');
                     return;
                 }
 
                 currentStudentId = studentId;
-                alert(`✅ 学生 ${name} 注册成功！`);
+                showNotify(`学生「${name}」注册成功！`, 'success');
                 
                 // 隐藏登录模态框
                 document.getElementById('authModal').style.display = 'none';
@@ -1354,7 +1602,7 @@
                 await loadLearningProgress();
                 await loadConversationList();
             } catch (err) {
-                alert('注册失败: ' + err.message);
+                showNotify('网络请求失败，请检查网络连接后重试', 'error');
             } finally {
                 hideLoading();
             }
@@ -1363,10 +1611,10 @@
         // 登录学生
         async function loginStudent() {
             const studentId = document.getElementById('loginStudentId').value.trim();
-            const name = document.getElementById('loginStudentName').value.trim();
+            const password = document.getElementById('loginPassword').value;
 
-            if (!studentId || !name) {
-                alert('请填写学号和姓名');
+            if (!studentId || !password) {
+                showNotify('请填写学号和密码', 'warning');
                 return;
             }
 
@@ -1375,11 +1623,26 @@
                 const resp = await fetch('/api/students/login', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({student_id: studentId, name})
+                    body: JSON.stringify({student_id: studentId, password})
                 });
-                const data = await resp.json();
+                // 安全解析 JSON，防止非 JSON 响应崩溃
+                let data = {};
+                try { data = await resp.json(); } catch (_) { /* ignore */ }
                 if (!resp.ok) {
-                    alert('❌ ' + (data.detail || '登录失败'));
+                    const rawDetail = data.detail || '';
+                    let errMsg = rawDetail || '服务器返回未知错误';
+                    if (typeof errMsg === 'string') {
+                        if (errMsg.includes('尚未设置密码')) {
+                            errMsg = '该账号尚未设置密码，请联系管理员';
+                        } else if (errMsg.includes('密码错误')) {
+                            errMsg = '密码错误，请重新输入';
+                        } else if (errMsg.includes('学号不存在')) {
+                            errMsg = '该学号不存在，请先注册';
+                        } else if (errMsg.includes('Internal Server Error') || errMsg.includes('500')) {
+                            errMsg = '服务器内部错误，请稍后重试';
+                        }
+                    }
+                    showNotify(errMsg, 'error');
                     return;
                 }
 
@@ -1391,7 +1654,7 @@
                 // 显示学生信息
                 displayStudentInfo(data.student);
                 
-                alert(`✅ 欢迎回来，${data.student.name}！`);
+                showNotify(`✅ 欢迎回来，${data.student.name}！`, 'success');
 
                 // 建立 WebSocket 连接
                 connectWebSocket(studentId);
@@ -1403,7 +1666,7 @@
                 await loadLearningProgress();
                 await loadConversationList();
             } catch (err) {
-                alert('登录失败: ' + err.message);
+                showNotify('网络请求失败，请检查网络连接后重试', 'error');
             } finally {
                 hideLoading();
             }
@@ -1427,8 +1690,8 @@
         }
 
         // 退出登录
-        function logout() {
-            if (confirm('确定要退出登录吗？')) {
+        async function logout() {
+            if (await showConfirm('确定要退出登录吗？')) {
                 currentStudentId = null;
                 currentProfile = null;
                 allResources = [];
@@ -1941,7 +2204,7 @@
             
             if (!message) return;
             if (!currentStudentId) {
-                alert('请先登录');
+                showNotify('请先登录', 'warning');
                 document.getElementById('authModal').style.display = 'flex';
                 return;
             }
@@ -2062,28 +2325,48 @@
                 inlineCodes.push(`<code>${escapeHtml(code)}</code>`);
                 return `%%INLINECODE_${idx}%%`;
             });
-            // 先转义 HTML
+            // 先转义 HTML 特殊字符
             processed = escapeHtml(processed);
             // 恢复代码块
             processed = processed.replace(/%%CODEBLOCK_(\d+)%%/g, (_, i) => codeBlocks[i]);
             processed = processed.replace(/%%INLINECODE_(\d+)%%/g, (_, i) => inlineCodes[i]);
-            // 换行：先把 \n 统一转为 <br>，后续处理基于 <br>
-            processed = processed.replace(/\n/g, '<br>');
-            // 应用 Markdown 格式化（此时已安全转义）
-            let result = processed
-                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.+?)\*/g, '<em>$1</em>');
-            // 处理分隔线 ---（在标题之前，避免和 ## 冲突）
-            result = result.replace(/(^|<br>)---+(?=<br>|$)/g, '$1<hr style="border:none;border-top:1px solid var(--border);margin:12px 0;">');
-            // 标题替换：匹配行首或<br>后的#，避免替换正文中的#
-            result = result.replace(/(^|<br>)###\s+(.+?)(?=<br>|$)/g, '$1<h3>$2</h3>');
-            result = result.replace(/(^|<br>)##\s+(.+?)(?=<br>|$)/g, '$1<h2>$2</h2>');
-            result = result.replace(/(^|<br>)#\s+(.+?)(?=<br>|$)/g, '$1<h1>$2</h1>');
-            // 处理引用块 >
-            result = result.replace(/(^|<br>)&gt;\s+(.+?)(?=<br>|$)/g, '$1<blockquote style="margin:4px 0;padding:8px 12px;border-left:3px solid var(--primary);background:#F8FAFC;color:var(--text-light);">$2</blockquote>');
-            // 处理列表（在行首或<br>后的 - 或 *，且不是 ** 加粗）
-            result = result.replace(/(^|<br>)(\s*)-\s+(.+?)(?=<br>|$)/g, '$1$2• $3');
-            result = result.replace(/(^|<br>)(\s*)\*(?!\*)\s+(.+?)(?=<br>|$)/g, '$1$2• $3');
+
+            // 将文本按段落分割（双换行分隔），每段用 <p> 包裹
+            // 但代码块已经替换成HTML标签，需要保护它们不被包裹在 <p> 中
+            const segments = processed.split(/\n\n+/);
+            let result = '';
+            segments.forEach(seg => {
+                const trimmed = seg.trim();
+                if (!trimmed) return;
+                // 如果段落已经是 HTML 块标签开头，不包裹 <p>
+                if (/^(<pre>|<blockquote>|<h[1-6]>|<hr|<ul>|<ol>|<li>|<div>)/i.test(trimmed)) {
+                    result += trimmed + '\n';
+                    return;
+                }
+                // 处理段内单行换行 → <br>
+                const withBreaks = trimmed.replace(/\n/g, '<br>');
+                // 处理 Markdown 加粗/斜体
+                let formatted = withBreaks
+                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.+?)\*/g, '<em>$1</em>');
+                // 处理标题（在行首）
+                formatted = formatted.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>');
+                formatted = formatted.replace(/^##\s+(.+)$/gm, '<h2>$1</h2>');
+                formatted = formatted.replace(/^#\s+(.+)$/gm, '<h1>$1</h1>');
+                // 处理分隔线
+                formatted = formatted.replace(/^---+(?=$|<br>)/gm, '<hr style="border:none;border-top:1px solid var(--border);margin:12px 0;">');
+                // 处理引用块
+                formatted = formatted.replace(/^&gt;\s+(.+)$/gm, '<blockquote style="margin:4px 0;padding:8px 12px;border-left:3px solid var(--primary);background:#F8FAFC;color:var(--text-light);">$1</blockquote>');
+                // 处理列表项
+                formatted = formatted.replace(/^(\s*)-\s+(.+)$/gm, '$1• $2');
+                formatted = formatted.replace(/^(\s*)\*(?!\*)\s+(.+)$/gm, '$1• $2');
+                // 如果格式化后已经是块级标签，不包裹 <p>
+                if (/^<(h[1-6]|blockquote|hr|pre|ul|ol|div)/i.test(formatted)) {
+                    result += formatted + '\n';
+                } else {
+                    result += '<p>' + formatted + '</p>\n';
+                }
+            });
             return result;
         }
 
@@ -2218,6 +2501,7 @@
                 </div>`;
                 html += resources.map(r => `
                     <div class="resource-card" onclick="viewResource('${r.id}')">
+                        <button class="resource-delete" onclick="event.stopPropagation();deleteResource('${r.id}')" title="删除资源">🗑</button>
                         <div class="type-icon">${getTypeEmoji(r.type)}</div>
                         <div class="title">${r.title}</div>
                         <div class="meta">
@@ -2267,7 +2551,10 @@
 
                 let bodyContent = '';
                 let exportButton = '';
-                if (resource.format === 'json' && resource.metadata) {
+                if (resource.type === 'ppt_slides' && resource.metadata) {
+                    bodyContent = renderPPTSlidesContent(resource.metadata);
+                    exportButton = `<button class="btn btn-sm btn-primary" onclick="exportResource('${resourceId}', '${resource.title}')">📥 导出Markdown</button>`;
+                } else if (resource.format === 'json' && resource.metadata) {
                     if (resource.type === 'exercise') {
                         bodyContent = renderExerciseContent(resource.metadata, resourceId);
                     } else if (resource.type === 'mind_map') {
@@ -2276,9 +2563,6 @@
                         bodyContent = renderReadingContent(resource.metadata);
                     } else if (resource.type === 'code_practice') {
                         bodyContent = renderCodeContent(resource.metadata);
-                    } else if (resource.type === 'ppt_slides') {
-                        bodyContent = renderPPTSlidesContent(resource.metadata);
-                        exportButton = `<button class="btn btn-sm btn-primary" onclick="exportResource('${resourceId}', '${resource.title}')">📥 导出Markdown</button>`;
                     } else {
                         bodyContent = `<pre>${JSON.stringify(resource.metadata, null, 2)}</pre>`;
                     }
@@ -2305,7 +2589,7 @@
 
                 modal.style.display = 'flex';
             } catch (err) {
-                alert('加载资源失败: ' + err.message);
+                showNotify('加载资源失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -2369,7 +2653,7 @@
                 });
                 const data = await resp.json();
                 if (!resp.ok) {
-                    alert('批阅失败: ' + (data.detail || '未知错误'));
+                    showNotify('批阅失败: ' + (data.detail || '未知错误'), 'error');
                     return;
                 }
 
@@ -2399,12 +2683,12 @@
 
                 // 根据成绩更新画像（如果得分率较低，标记薄弱知识点）
                 if (result.score_rate < 60) {
-                    alert('⚠️ 本次练习得分率较低，建议重新学习相关知识点后再练习。');
+                    showNotify('⚠️ 本次练习得分率较低，建议重新学习相关知识点后再练习。', 'warning');
                 } else if (result.score_rate >= 90) {
-                    alert('🎉 恭喜！本次练习表现优秀！');
+                    showNotify('🎉 恭喜！本次练习表现优秀！', 'success');
                 }
             } catch (err) {
-                alert('批阅失败: ' + err.message);
+                showNotify('批阅失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -2444,7 +2728,7 @@
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             } catch (err) {
-                alert('导出失败: ' + err.message);
+                showNotify('导出失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -2521,47 +2805,56 @@
         }
 
         function renderPPTSlidesContent(meta) {
-            let html = `<p>难度: ${meta.difficulty || '中等'} | 预估时长: ${meta.estimated_duration || ''}</p>`;
+            let html = `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">`;
+            html += `<span style="background:var(--primary);color:#fff;padding:4px 10px;border-radius:12px;font-size:12px;">难度: ${meta.difficulty || '中等'}</span>`;
+            if (meta.estimated_duration) {
+                html += `<span style="background:#F1F5F9;padding:4px 10px;border-radius:12px;font-size:12px;color:var(--text-light);">⏱️ 预估时长: ${meta.estimated_duration}</span>`;
+            }
+            html += `</div>`;
+
             if (meta.summary) {
-                html += `<div style="background:#F8FAFC;padding:12px;border-radius:8px;margin:8px 0;"><strong>课程总结：</strong>${meta.summary}</div>`;
+                html += `<div style="background:linear-gradient(135deg,#F0F9FF 0%,#E0F2FE 100%);padding:14px 16px;border-radius:10px;margin:12px 0;border-left:4px solid var(--primary);"><strong style="color:var(--primary);">📋 课程总结：</strong>${meta.summary}</div>`;
             }
 
             const chapters = meta.chapters || [];
             if (chapters.length === 0) {
-                html += `<div style="background:#FEE2E2;padding:16px;border-radius:8px;margin:12px 0;color:#991B1B;">
+                html += `<div style="background:#FEE2E2;padding:16px;border-radius:10px;margin:12px 0;color:#991B1B;">
                     <strong>⚠️ 课件内容为空</strong><br>
                     该课件讲义暂无内容，可能是生成过程中出现错误。请尝试重新生成学习资源。
                 </div>`;
             }
-            chapters.forEach(ch => {
-                html += `<div style="background:#FFFFFF;padding:16px;margin:12px 0;border-radius:8px;border:1px solid var(--border);">`;
-                html += `<h4 style="color:var(--primary);">第${ch.chapter_id}章: ${ch.title || ''}</h4>`;
+            chapters.forEach((ch, idx) => {
+                html += `<div style="background:#FFFFFF;padding:20px;margin:14px 0;border-radius:10px;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,0.04);">`;
+                html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">`;
+                html += `<span style="background:var(--primary);color:#fff;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:13px;font-weight:600;">${ch.chapter_id}</span>`;
+                html += `<h4 style="color:var(--primary);margin:0;font-size:16px;">${ch.title || ''}</h4>`;
+                html += `</div>`;
                 const chContent = ch.content || '';
                 if (chContent.trim() && chContent.trim() !== '...' && chContent.trim() !== '待补充') {
                     html += `<div style="margin:8px 0;line-height:1.8;">${formatContent(chContent)}</div>`;
                 } else {
-                    html += `<div style="margin:8px 0;padding:12px;background:#FEF3C7;border-radius:4px;color:#92400E;font-size:13px;">
+                    html += `<div style="margin:8px 0;padding:12px;background:#FEF3C7;border-radius:6px;color:#92400E;font-size:13px;">
                         <strong>⏳ 本章内容待生成</strong><br>
                         该章节暂无详细内容，请稍后刷新或重新生成资源。
                     </div>`;
                 }
 
                 if (ch.key_points && ch.key_points.length > 0) {
-                    html += `<div style="background:#FEF3C7;padding:8px;border-radius:4px;margin:8px 0;"><strong>🔑 要点：</strong>${ch.key_points.join('、')}</div>`;
+                    html += `<div style="background:#FFFBEB;padding:10px 14px;border-radius:6px;margin:12px 0;border-left:3px solid #F59E0B;"><strong style="color:#B45309;">🔑 本章要点：</strong>${ch.key_points.join('、')}</div>`;
                 }
 
                 const quiz = ch.quiz || [];
                 if (quiz.length > 0) {
-                    html += `<div style="margin-top:12px;"><strong>📝 自测练习：</strong></div>`;
+                    html += `<div style="margin-top:14px;"><strong style="color:var(--primary);">📝 自测练习</strong></div>`;
                     quiz.forEach((q, i) => {
-                        html += `<div style="background:#F8FAFC;padding:8px;margin:6px 0;border-radius:4px;">`;
-                        html += `<strong>${i+1}. ${q.question}</strong>`;
+                        html += `<div style="background:#F8FAFC;padding:12px;margin:8px 0;border-radius:6px;border:1px solid #E2E8F0;">`;
+                        html += `<strong style="color:var(--text);">${i+1}. ${q.question}</strong>`;
                         if (q.options) {
-                            html += `<div style="margin:4px 0;">${q.options.map(o => `<div style="margin:2px 0;">${o}</div>`).join('')}</div>`;
+                            html += `<div style="margin:6px 0;">${q.options.map(o => `<div style="margin:3px 0;padding:4px 8px;background:#fff;border-radius:4px;border:1px solid #E2E8F0;font-size:13px;">${o}</div>`).join('')}</div>`;
                         }
-                        html += `<details style="margin-top:6px;"><summary style="cursor:pointer;color:var(--primary);font-size:12px;">查看答案</summary>`;
-                        html += `<div style="margin-top:4px;padding:6px;background:#ECFDF5;border-radius:4px;font-size:12px;">`;
-                        html += `<strong>答案：</strong>${q.answer}<br><strong>解析：</strong>${q.analysis}</div></details>`;
+                        html += `<details style="margin-top:8px;"><summary style="cursor:pointer;color:var(--primary);font-size:12px;font-weight:500;">查看答案与解析</summary>`;
+                        html += `<div style="margin-top:6px;padding:8px;background:#ECFDF5;border-radius:6px;font-size:13px;">`;
+                        html += `<strong>答案：</strong>${q.answer || '暂无'}<br><strong>解析：</strong>${q.analysis || '暂无'}</div></details>`;
                         html += `</div>`;
                     });
                 }
@@ -2570,7 +2863,7 @@
 
             const fr = meta.further_reading || [];
             if (fr.length > 0) {
-                html += `<div style="margin-top:16px;"><h4>📚 延伸阅读</h4><ul>${fr.map(item => `<li>${item}</li>`).join('')}</ul></div>`;
+                html += `<div style="margin-top:16px;padding:16px;background:#F0F9FF;border-radius:10px;"><h4 style="color:var(--primary);margin:0 0 10px 0;">📚 延伸阅读</h4><ul style="margin:0;padding-left:18px;">${fr.map(item => `<li style="margin:6px 0;">${item}</li>`).join('')}</ul></div>`;
             }
             return html;
         }
@@ -2620,10 +2913,10 @@
                         rating: rating
                     })
                 });
-                alert('✅ 感谢你的反馈！');
+                showNotify('✅ 感谢你的反馈！', 'success');
                 document.getElementById('resourceModal').style.display = 'none';
             } catch (err) {
-                alert('反馈提交失败');
+                showNotify('反馈提交失败', 'error');
             }
         }
 
@@ -2746,7 +3039,7 @@
             try {
                 const resp = await fetch(`/api/students/${currentStudentId}/conversation/${convId}`);
                 if (!resp.ok) {
-                    alert('对话加载失败');
+                    showNotify('对话加载失败', 'error');
                     return;
                 }
                 const data = await resp.json();
@@ -2782,7 +3075,7 @@
                 // 切换到对话标签
                 switchTab('chat');
             } catch (err) {
-                alert('加载对话失败: ' + err.message);
+                showNotify('加载对话失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -2791,7 +3084,7 @@
         // 创建新对话
         async function createNewConversation() {
             if (!currentStudentId) {
-                alert('请先登录');
+                showNotify('请先登录', 'warning');
                 return;
             }
 
@@ -2802,7 +3095,7 @@
                 });
                 const data = await resp.json();
                 if (!resp.ok) {
-                    alert('创建失败');
+                    showNotify('创建失败', 'error');
                     return;
                 }
                 
@@ -2827,23 +3120,43 @@
                 // 切换到对话标签
                 switchTab('chat');
             } catch (err) {
-                alert('创建失败: ' + err.message);
+                showNotify('创建失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
+            }
+        }
+
+        // 删除学习资源
+        async function deleteResource(resourceId) {
+            if (!await showConfirm('确定要删除这个学习资源吗？此操作不可撤销。')) return;
+
+            try {
+                const resp = await fetch(`/api/resources/${resourceId}`, {
+                    method: 'DELETE'
+                });
+                if (!resp.ok) {
+                    showNotify('删除失败', 'error');
+                    return;
+                }
+                showNotify('资源已删除', 'success');
+                // 刷新资源列表
+                await loadStudentResources();
+            } catch (err) {
+                showNotify('删除失败: ' + err.message, 'error');
             }
         }
 
         // 删除对话
         async function deleteConversation(convId) {
             if (!currentStudentId) return;
-            if (!confirm('确定要删除这个对话吗？此操作不可撤销。')) return;
+            if (!await showConfirm('确定要删除这个对话吗？此操作不可撤销。')) return;
 
             try {
                 const resp = await fetch(`/api/students/${currentStudentId}/conversation/${convId}`, {
                     method: 'DELETE'
                 });
                 if (!resp.ok) {
-                    alert('删除失败');
+                    showNotify('删除失败', 'error');
                     return;
                 }
                 
@@ -2866,7 +3179,7 @@
                 // 刷新对话列表
                 await loadConversationList();
             } catch (err) {
-                alert('删除失败: ' + err.message);
+                showNotify('删除失败: ' + err.message, 'error');
             }
         }
 
@@ -2891,12 +3204,14 @@
         // 快速生成资源
         async function quickGenerate() {
             if (!currentStudentId) {
-                alert('请先登录');
+                showNotify('请先登录', 'warning');
                 document.getElementById('authModal').style.display = 'flex';
                 return;
             }
-            const subject = prompt('请输入科目（如：数据结构）：', '数据结构');
-            const topic = prompt('请输入主题（如：二叉树）：', '二叉树');
+            const subject = await showInput('请输入科目：', '数据结构');
+            if (!subject) return;
+            const topic = await showInput('请输入主题：', '二叉树');
+            if (!topic) return;
             if (subject && topic) {
                 switchTab('chat');
                 addChatMessage('user', `生成 ${subject} ${topic} 的学习资料`);
@@ -2909,7 +3224,7 @@
         // 快速评估
         async function quickEvaluate() {
             if (!currentStudentId) {
-                alert('请先登录');
+                showNotify('请先登录', 'warning');
                 document.getElementById('authModal').style.display = 'flex';
                 return;
             }
@@ -2970,7 +3285,7 @@
                 container.innerHTML = html;
                 switchTab('evaluation');
             } catch (err) {
-                alert('评估失败: ' + err.message);
+                showNotify('评估失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -2979,12 +3294,14 @@
         // 快速规划路径
         async function quickPlanPath() {
             if (!currentStudentId) {
-                alert('请先登录');
+                showNotify('请先登录', 'warning');
                 document.getElementById('authModal').style.display = 'flex';
                 return;
             }
-            const subject = prompt('请输入科目：', '数据结构');
-            const topic = prompt('请输入主题：', '二叉树');
+            const subject = await showInput('请输入科目：', '数据结构');
+            if (!subject) return;
+            const topic = await showInput('请输入主题：', '二叉树');
+            if (!topic) return;
             if (subject && topic) {
                 showLoading('规划学习路径...');
                 try {
@@ -2998,7 +3315,7 @@
                     renderLearningPath();
                     switchTab('path');
                 } catch (err) {
-                    alert('路径规划失败: ' + err.message);
+                    showNotify('路径规划失败: ' + err.message, 'error');
                 } finally {
                     hideLoading();
                 }

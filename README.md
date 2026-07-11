@@ -88,7 +88,7 @@ python main.py
 或双击 `start.bat` (Windows)
 
 5. **访问系统**
-打开浏览器访问：https://localhost:8000
+打开浏览器访问：http://localhost:8000
 
 ## 使用指南
 

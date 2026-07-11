@@ -30,7 +30,7 @@ if not exist "static" mkdir static
 :: 启动服务
 echo [3/3] 启动智能学习系统...
 echo.
-echo 访问地址: https://localhost:8000
+echo 访问地址: http://localhost:8000
 echo 按 Ctrl+C 停止服务
 echo.
 py main.py

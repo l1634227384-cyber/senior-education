@@ -146,18 +146,19 @@ class LLMClient:
         """
         # 使用 httpx 直接发送请求以便逐行读取 stream
         import aiohttp
-        from urllib.parse import urljoin
 
         base = settings.LLM_API_BASE.rstrip('/')
-        url = urljoin(base + '/', 'v1/chat/completions')
+        # 兼容 base_url 末尾是否包含 /v1（如 https://api.deepseek.com/v1）
+        if base.endswith('/v1'):
+            url = f"{base}/chat/completions"
+        else:
+            url = f"{base}/v1/chat/completions"
 
         payload = {
             "model": self.model,
             "messages": messages,
             "temperature": temperature or settings.LLM_TEMPERATURE,
             "max_tokens": max_tokens or settings.LLM_MAX_TOKENS,
-            # DeepSeek 思考模式开启
-            "extra_body": {"thinking": {"type": "enabled"}},
             "stream": True
         }
 
@@ -443,7 +444,7 @@ class ContentAgent(BaseAgent):
         
         resource = {
             "type": "lecture_doc",
-            "title": f"{subject} - {topic} 课程讲解",
+            "title": f"{subject} · {topic} 课程讲解",
             "subject": subject,
             "topic": topic,
             "difficulty": difficulty,
@@ -710,7 +711,7 @@ class MindMapAgent(BaseAgent):
         
         resource = {
             "type": "mind_map",
-            "title": f"{subject} - {topic} 思维导图",
+            "title": f"{subject} · {topic} 思维导图",
             "subject": subject,
             "topic": topic,
             "content": json.dumps(result, ensure_ascii=False),
@@ -800,7 +801,7 @@ class ReadingAgent(BaseAgent):
         
         resource = {
             "type": "reading_material",
-            "title": f"{subject} - {topic} 拓展阅读",
+            "title": f"{subject} · {topic} 拓展阅读",
             "subject": subject,
             "topic": topic,
             "content": json.dumps(result, ensure_ascii=False),
@@ -894,7 +895,7 @@ class CodeAgent(BaseAgent):
         
         resource = {
             "type": "code_practice",
-            "title": f"{subject} - {topic} 代码实操",
+            "title": f"{subject} · {topic} 代码实操",
             "subject": subject,
             "topic": topic,
             "difficulty": difficulty,
@@ -964,7 +965,7 @@ Markdown格式要求：
 
 请直接输出完整的Markdown课件内容，确保每章内容详实充实。"""
 
-        md_content = await self.llm.chat(self.build_messages(md_prompt), temperature=0.6, max_tokens=8000)
+        md_content = await self.llm.chat(self.build_messages(md_prompt), temperature=0.6, max_tokens=4096)
 
         # 第二步：从Markdown解析结构化数据用于前端交互
         metadata = self._parse_markdown_to_metadata(md_content, subject, topic, difficulty)
@@ -993,7 +994,7 @@ Markdown格式要求：
         import re
 
         metadata = {
-            "title": f"{subject} - {topic} 课件讲义",
+            "title": f"{subject} · {topic} 课件讲义",
             "subject": subject,
             "topic": topic,
             "difficulty": difficulty,
@@ -1626,7 +1627,7 @@ class MultiAgentSystem:
             try:
                 print(f"[资源生成] 开始调用 {agent_name} ...")
                 # 对每个 agent.process 添加超时保护
-                result_state = await asyncio.wait_for(agent.process(agent_state), timeout=30)
+                result_state = await asyncio.wait_for(agent.process(agent_state), timeout=60)
                 resources = result_state.get("generated_resources", [])
                 print(f"[资源生成] {agent_name} 生成完成，产出 {len(resources)} 个资源")
                 for r in resources:
@@ -1634,7 +1635,7 @@ class MultiAgentSystem:
                 return resources, None
             except asyncio.TimeoutError as e:
                 # 超时视作失败，返回空资源并记录错误信息
-                err_msg = f"timeout after 30s"
+                err_msg = f"timeout after 60s"
                 print(f"[警告] 智能体 {agent_name} 超时: {err_msg}")
                 import traceback
                 traceback.print_exc()
@@ -1708,17 +1709,17 @@ class MultiAgentSystem:
     def _create_default_resource(self, resource_type: str, subject: str, topic: str) -> Dict[str, Any]:
         """创建默认资源，用于补齐缺失的类型"""
         type_titles = {
-            "lecture_doc": f"{subject} - {topic} 课程讲解",
-            "exercise": f"{subject} - {topic} 练习题",
-            "mind_map": f"{subject} - {topic} 思维导图",
-            "reading_material": f"{subject} - {topic} 拓展阅读",
-            "code_practice": f"{subject} - {topic} 代码实操",
-            "ppt_slides": f"{subject} - {topic} 课件讲义",
+            "lecture_doc": f"{subject} · {topic} 课程讲解",
+            "exercise": f"{subject} · {topic} 练习题",
+            "mind_map": f"{subject} · {topic} 思维导图",
+            "reading_material": f"{subject} · {topic} 拓展阅读",
+            "code_practice": f"{subject} · {topic} 代码实操",
+            "ppt_slides": f"{subject} · {topic} 课件讲义",
         }
         type_contents = {
             "lecture_doc": f"# {subject} - {topic}\n\n## 概述\n\n本节将介绍{topic}的核心概念和基本原理。\n\n## 学习目标\n\n1. 理解{topic}的基本概念\n2. 掌握{topic}的核心方法\n3. 能够运用{topic}解决实际问题\n\n## 详细内容\n\n待生成...",
             "exercise": json.dumps({
-                "title": f"{subject} - {topic} 练习题",
+                "title": f"{subject} · {topic} 练习题",
                 "subject": subject,
                 "topic": topic,
                 "total_questions": 5,
@@ -1740,7 +1741,7 @@ class MultiAgentSystem:
                 "total_score": 10
             }, ensure_ascii=False),
             "mind_map": json.dumps({
-                "title": f"{subject} - {topic} 思维导图",
+                "title": f"{subject} · {topic} 思维导图",
                 "subject": subject,
                 "topic": topic,
                 "root": {
@@ -1753,7 +1754,7 @@ class MultiAgentSystem:
                 }
             }, ensure_ascii=False),
             "reading_material": json.dumps({
-                "title": f"{subject} - {topic} 拓展阅读",
+                "title": f"{subject} · {topic} 拓展阅读",
                 "subject": subject,
                 "topic": topic,
                 "materials": [
@@ -1771,7 +1772,7 @@ class MultiAgentSystem:
                 ]
             }, ensure_ascii=False),
             "code_practice": json.dumps({
-                "title": f"{subject} - {topic} 代码实操",
+                "title": f"{subject} · {topic} 代码实操",
                 "subject": subject,
                 "topic": topic,
                 "language": "python",
@@ -1792,7 +1793,7 @@ class MultiAgentSystem:
                 "extended_exercises": [],
                 "summary": f"通过本练习掌握{topic}的编程实现"
             }, ensure_ascii=False),
-            "ppt_slides": f"# {subject} - {topic} 课件讲义\n\n> 科目：{subject} | 主题：{topic}\n\n---\n\n## 1. 课程导入\n\n本节课程将带领大家深入了解{topic}。\n\n## 2. 核心概念\n\n### 2.1 基本概念\n\n{topic}是{subject}中的重要内容...\n\n### 2.2 关键原理\n\n...\n\n## 3. 案例分析\n\n通过实际案例加深理解...\n\n## 4. 总结\n\n本节重点回顾...",
+            "ppt_slides": f"# {subject} - {topic} 课件讲义\n\n> 科目：{subject} | 主题：{topic}\n\n---\n\n## 1. 课程导入\n\n本节课程将带领大家深入了解{topic}的基本概念、核心原理以及在实际场景中的应用。通过本节课的学习，你将建立对{topic}的系统认知，并能够运用相关知识解决基础问题。\n\n## 2. 核心概念\n\n### 2.1 基本概念\n\n{topic}是{subject}领域中的重要基础内容。它的核心思想是将复杂问题分解为更小的、可管理的单元，通过建立清晰的结构关系来简化理解和操作。\n\n**主要特点：**\n- 结构清晰，层次分明\n- 易于理解和扩展\n- 在实际工程中有广泛应用\n\n### 2.2 关键原理\n\n{topic}的实现依赖于以下关键原理：\n\n1. **原理一：分解与组合**\n   将大问题分解为子问题，分别解决后再组合结果。\n\n2. **原理二：递归与迭代**\n   通过递归或迭代的方式处理结构中的每一个节点。\n\n3. **原理三：状态维护**\n   在操作过程中需要维护当前状态，确保结构的完整性。\n\n## 3. 案例分析\n\n### 案例一：基础应用\n\n假设你需要组织一组数据，要求能够快速查找、插入和删除。使用{topic}可以高效地实现这些操作。\n\n### 案例二：实际工程场景\n\n在实际的软件系统中，{topic}常被用于实现索引结构、表达式解析、决策逻辑等核心功能。\n\n## 4. 总结\n\n本节重点回顾：\n- 理解{topic}的基本定义和结构特征\n- 掌握核心操作（创建、遍历、修改）的实现思路\n- 了解{topic}在{subject}中的典型应用场景\n- 能够分析简单问题并选择合适的数据结构\n\n**自测练习：**\n1. {topic}的主要优势是什么？\n2. 在什么场景下应该优先使用{topic}？\n3. 常见的{topic}操作有哪些？"
         }
 
         return {
