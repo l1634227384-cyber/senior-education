@@ -749,6 +749,34 @@
             grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
             gap: 16px;
         }
+        .profile-radar-card {
+            grid-column: 1 / -1;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 28px;
+            flex-wrap: wrap;
+        }
+        .profile-radar-card .radar-chart-wrap { flex-shrink: 0; line-height: 0; }
+        .profile-radar-card .radar-info { flex: 1; min-width: 220px; }
+        .profile-radar-card .radar-info h3 {
+            font-size: 15px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .profile-radar-card .radar-info p {
+            font-size: 12.5px;
+            color: var(--text-light);
+            line-height: 1.8;
+        }
+        .radar-axis-label { font-size: 11px; fill: var(--text-light); }
+        .radar-tick-label { font-size: 9.5px; fill: var(--text-faint); }
         .profile-dimension-card {
             background: var(--bg-card);
             border-radius: var(--radius);
@@ -1276,11 +1304,6 @@
                 <div class="chat-input-area">
                     <input type="text" id="chatInput" placeholder="输入消息... 例如：我想学习数据结构中的二叉树"
                            onkeypress="if(event.key==='Enter')sendMessage()">
-                    <select id="chatType" style="padding:8px;border-radius:8px;border:1px solid var(--border);">
-                        <option value="general">通用对话</option>
-                        <option value="profile">画像构建</option>
-                        <option value="tutor">辅导答疑</option>
-                    </select>
                     <button class="btn btn-primary" onclick="sendMessage()">发送</button>
                 </div>
             </div>
@@ -1687,6 +1710,113 @@
             dims.innerHTML = html || '<div style="font-size:12px;">画像构建中，请继续对话...</div>';
         }
 
+        // 将8个维度的原始画像数据，换算成 0-100 的"维度完整度/强度"分数，用于雷达图总览
+        function computeProfileRadarScores(profile) {
+            const kb = profile.knowledge_base || {};
+            const cs = profile.cognitive_style || {};
+            const lp = profile.learning_preference || {};
+            const ep = profile.error_patterns || {};
+            const pace = profile.learning_pace || {};
+            const goals = profile.goal_orientation || {};
+            const interests = profile.subject_interests || {};
+            const habits = profile.learning_habits || {};
+
+            const clamp = (v) => Math.max(0, Math.min(100, Math.round(v || 0)));
+
+            // 1. 知识基础：各科目分数的平均值
+            const kbVals = Object.entries(kb).filter(([k, v]) => typeof v === 'number').map(([, v]) => v);
+            const kbScore = kbVals.length ? kbVals.reduce((a, b) => a + b, 0) / kbVals.length : 0;
+
+            // 2. 认知风格：四个子分数的平均值
+            const csVals = [cs.visual_score, cs.verbal_score, cs.active_score, cs.reflective_score].filter(v => typeof v === 'number');
+            const csScore = csVals.length ? csVals.reduce((a, b) => a + b, 0) / csVals.length : 0;
+
+            // 3. 学习偏好：已识别的偏好格式数量（越多说明画像越具体）
+            const lpScore = Math.min(100, (lp.preferred_formats || []).length * 25);
+
+            // 4. 易错点偏好：已识别的错误类型 + 易错知识点数量
+            const errCount = (ep['常见错误类型'] || ep.common_errors || []).length + (ep['易错知识点'] || ep.weak_points || []).length;
+            const epScore = Math.min(100, errCount * 20);
+
+            // 5. 学习节奏：优先用完成率，否则用已填写字段数量估算
+            let paceScore;
+            if (typeof pace.completion_rate === 'number') {
+                paceScore = pace.completion_rate;
+            } else {
+                paceScore = [pace.speed, pace.avg_session_minutes, pace.sessions_per_week].filter(v => v !== undefined && v !== null).length / 3 * 100;
+            }
+
+            // 6. 目标导向：短期+长期目标数量
+            const goalScore = Math.min(100, ((goals.short_term || []).length + (goals.long_term || []).length) * 25);
+
+            // 7. 学科兴趣：直接用兴趣度，缺失时用主/次兴趣数量估算
+            const interestScore = typeof interests.interest_level === 'number' && interests.interest_level > 0
+                ? interests.interest_level
+                : Math.min(100, ((interests.primary || []).length + (interests.secondary || []).length) * 20);
+
+            // 8. 学习习惯：已填写字段数量
+            const habitFields = [habits.best_time, habits.note_taking, habits.review_frequency, habits.group_study].filter(v => v !== undefined && v !== null && v !== '');
+            const habitScore = Math.min(100, habitFields.length * 25);
+
+            return [
+                { label: '知识基础', icon: '📚', value: clamp(kbScore) },
+                { label: '认知风格', icon: '🧠', value: clamp(csScore) },
+                { label: '学习偏好', icon: '🎯', value: clamp(lpScore) },
+                { label: '易错点', icon: '⚠️', value: clamp(epScore) },
+                { label: '学习节奏', icon: '⏱️', value: clamp(paceScore) },
+                { label: '目标导向', icon: '🚩', value: clamp(goalScore) },
+                { label: '学科兴趣', icon: '⭐', value: clamp(interestScore) },
+                { label: '学习习惯', icon: '📅', value: clamp(habitScore) },
+            ];
+        }
+
+        // 用纯 SVG（无外部依赖，离线可用）绘制多维度雷达图
+        function buildProfileRadarSVG(dimensions) {
+            const size = 300;
+            const cx = size / 2, cy = size / 2;
+            const radius = 100;
+            const n = dimensions.length;
+            const angleFor = (i) => -Math.PI / 2 + (i * 2 * Math.PI / n);
+            const pointAt = (i, r) => {
+                const a = angleFor(i);
+                return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+            };
+
+            // 背景网格（20/40/60/80/100%）
+            let gridPolygons = '';
+            [0.2, 0.4, 0.6, 0.8, 1].forEach(ratio => {
+                const pts = dimensions.map((_, i) => pointAt(i, radius * ratio).join(',')).join(' ');
+                gridPolygons += `<polygon points="${pts}" fill="none" stroke="var(--border)" stroke-width="1"/>`;
+            });
+
+            // 轴线 + 标签
+            let axes = '';
+            let labels = '';
+            dimensions.forEach((d, i) => {
+                const [x, y] = pointAt(i, radius);
+                axes += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="var(--border)" stroke-width="1"/>`;
+                const [lx, ly] = pointAt(i, radius + 22);
+                labels += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" class="radar-axis-label">${d.icon} ${d.label}</text>`;
+            });
+
+            // 数据多边形
+            const dataPts = dimensions.map((d, i) => pointAt(i, radius * (d.value / 100)).join(',')).join(' ');
+            // 数据点小圆点
+            const dots = dimensions.map((d, i) => {
+                const [x, y] = pointAt(i, radius * (d.value / 100));
+                return `<circle cx="${x}" cy="${y}" r="3.5" fill="var(--primary)" stroke="white" stroke-width="1.5"/>`;
+            }).join('');
+
+            return `
+                <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+                    ${gridPolygons}
+                    ${axes}
+                    <polygon points="${dataPts}" fill="var(--primary)" fill-opacity="0.22" stroke="var(--primary)" stroke-width="2"/>
+                    ${dots}
+                    ${labels}
+                </svg>`;
+        }
+
         // 渲染完整画像页面（6+维度）
         function renderProfilePage(profile) {
             const container = document.getElementById('profileView');
@@ -1725,6 +1855,16 @@
             </div>`;
 
             html += `<div class="profile-grid">`;
+
+            // 雷达图总览：一屏看清8个维度的完整度/强度对比
+            const radarDims = computeProfileRadarScores(profile);
+            html += `<div class="profile-radar-card">
+                <div class="radar-chart-wrap">${buildProfileRadarSVG(radarDims)}</div>
+                <div class="radar-info">
+                    <h3>🕸️ 画像维度总览</h3>
+                    <p>雷达图展示了8个维度当前的完整度/强度，分数越高代表该维度通过对话已经被更充分地了解或该项特质越突出。继续和我聊天，各维度会持续被补全。</p>
+                </div>
+            </div>`;
 
             // 1. 知识基础
             const kbEntries = Object.entries(kb).filter(([k]) => !k.startsWith('_') && typeof k === 'string');
@@ -2002,8 +2142,7 @@
         async function sendMessage() {
             const input = document.getElementById('chatInput');
             const message = input.value.trim();
-            const chatType = document.getElementById('chatType').value;
-            
+
             if (!message) return;
             if (!currentStudentId) {
                 alert('请先登录');
@@ -2015,7 +2154,7 @@
             addChatMessage('user', message);
             input.value = '';
 
-            // 检测是否是资源生成请求（增强版意图识别）
+            // 检测是否是资源生成请求（增强版意图识别，纯规则快速通道）
             const genMatch = message.match(/生成\s*(.+?)\s*(.+?)\s*的?\s*(学习资料|资源|课程|课件|讲义|练习)/);
             if (genMatch) {
                 showLoading('正在生成全部学习资源...');
@@ -2024,7 +2163,9 @@
                 return;
             }
 
-            // 调用意图识别API，自动检测学习资料需求
+            // 调用意图识别API：由后端判断这句话属于"画像构建 / 辅导答疑 / 资源生成 / 通用对话"中的哪一种，
+            // 用户不再需要在下拉框里手动挑选对话类型，减少认知负担
+            let detectedType = 'general';
             try {
                 const intentResp = await fetch('/api/chat/intent', {
                     method: 'POST',
@@ -2038,9 +2179,14 @@
                     hideLoading();
                     return;
                 }
+                if (intentData.intent === 'profile_building') {
+                    detectedType = 'profile';
+                } else if (intentData.intent === 'tutoring') {
+                    detectedType = 'tutor';
+                }
             } catch (e) {
-                // 意图识别失败不影响正常对话
-                console.log('意图识别失败:', e);
+                // 意图识别失败不影响正常对话，退化为通用对话（后端会按辅导逻辑处理）
+                console.log('意图识别失败，已自动降级为通用对话:', e);
             }
 
             showLoading('智能体思考中...');
@@ -2056,8 +2202,8 @@
                 });
             }
 
-            // 通过 WebSocket 发送消息
-            const wsType = chatType === 'tutor' ? 'tutor' : chatType === 'profile' ? 'profile' : 'general';
+            // 通过 WebSocket 发送消息，类型已由意图识别自动判定
+            const wsType = detectedType;
 
             // 如果没有当前对话ID，先创建一个新对话
             if (!currentConversationId) {
@@ -2153,7 +2299,28 @@
         }
 
         // 生成资源（使用 SSE 流式展示思考过程）
-        async function generateResources(subject, topic) {
+        async function generateResources(subject, topic, forceRegenerate = false) {
+            // 去重提示：如果该学科+主题已经生成过资源，先询问用户是否需要重新生成，
+            // 避免每次都重复调用11个智能体、堆积重复资源
+            if (!forceRegenerate) {
+                const normalize = (s) => (s || '').trim().toLowerCase();
+                const existing = allResources.filter(r =>
+                    normalize(r.subject) === normalize(subject) && normalize(r.topic) === normalize(topic)
+                );
+                if (existing.length > 0) {
+                    const wantsNew = confirm(
+                        `你之前已经生成过「${subject} - ${topic}」的学习资源（共 ${existing.length} 个），\n` +
+                        `是否需要重新生成一份新的？\n\n` +
+                        `点击"确定"重新生成；点击"取消"直接查看已有资源。`
+                    );
+                    if (!wantsNew) {
+                        switchTab('resources');
+                        addChatMessage('assistant', `好的，为你打开「${escapeHtml(subject)} - ${escapeHtml(topic)}」已有的 ${existing.length} 个学习资源，在"学习资源"标签中可以查看。`);
+                        return;
+                    }
+                }
+            }
+
             // 若当前没有活跃对话，先创建一个，确保本次生成能关联到对话历史
             if (!currentConversationId) {
                 try {

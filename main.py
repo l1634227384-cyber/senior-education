@@ -1506,31 +1506,15 @@ async def websocket_chat(websocket: WebSocket, student_id: str):
                     summary = re.sub(r'<[^>]+>', '', summary)
                     response = f"已更新你的学习画像！{summary}"
 
-                elif chat_type == "tutor":
-                    messages.append({
-                        "role": "user", "content": message,
-                        "timestamp": datetime.now().isoformat()
-                    })
-
-                    print("[WS 智能体] 正在调用 multi_agent_system.run (智能辅导)...")
-                    result = await multi_agent_system.run(
-                        task_type="tutoring",
-                        task_params={"question": message},
-                        student_profile=profile_dict,
-                        messages=messages[-6:],
-                        student_id=student_id
-                    )
-                    print(f"[WS 智能体] 调用结束 (智能辅导), 返回结果大小: {len(str(result))} 字符")
-
-                    tut_response = result.get("tutoring_response", {})
-                    response = tut_response.get("detailed_answer", "请重新描述你的问题。")
-
                 else:
+                    # "tutor"（辅导答疑）与旧版"general"（通用对话）逻辑完全一致，
+                    # 现在由前端 /api/chat/intent 自动判定类型，这里统一走辅导智能体，
+                    # 不再需要两套重复代码。
                     messages.append({
                         "role": "user", "content": message,
                         "timestamp": datetime.now().isoformat()
                     })
-                    print("[WS 智能体] 正在调用 multi_agent_system.run (通用对话)...")
+                    print(f"[WS 智能体] 正在调用 multi_agent_system.run (辅导/通用, 原始类型: {chat_type})...")
                     result = await multi_agent_system.run(
                         task_type="tutoring",
                         task_params={"question": message},
@@ -1538,8 +1522,13 @@ async def websocket_chat(websocket: WebSocket, student_id: str):
                         messages=messages[-6:],
                         student_id=student_id
                     )
+                    print(f"[WS 智能体] 调用结束, 返回结果大小: {len(str(result))} 字符")
+
                     tut_response = result.get("tutoring_response", {})
-                    response = tut_response.get("detailed_answer", "你好！我是你的智能学习助手。你可以：\n1. 和我聊聊你的学习情况（画像构建）\n2. 提问学习问题（智能辅导）\n3. 输入'生成 [科目] [主题] 的学习资料'来获取学习资源")
+                    response = tut_response.get(
+                        "detailed_answer",
+                        "你好！我是你的智能学习助手。你可以：\n1. 和我聊聊你的学习情况（我会自动构建画像）\n2. 提问学习问题（自动进入辅导答疑）\n3. 输入'生成 [科目] [主题] 的学习资料'来获取学习资源"
+                    )
 
                 messages.append({
                     "role": "assistant", "content": response,
