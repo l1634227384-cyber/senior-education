@@ -33,6 +33,10 @@ echo.
 echo 访问地址: http://localhost:8000
 echo 按 Ctrl+C 停止服务
 echo.
+
+:: 延迟2秒后自动用默认浏览器打开（等待服务启动）
+start "" cmd /c "timeout /t 2 /nobreak >nul && start http://localhost:8000"
+
 py main.py
 
 pause

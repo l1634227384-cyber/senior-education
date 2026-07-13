@@ -1642,7 +1642,17 @@ async def system_info(db: AsyncSession = Depends(get_db)):
 # ==================== 启动入口 ====================
 
 if __name__ == "__main__":
+    import threading
+    import webbrowser
     import uvicorn
+
+    def _open_browser():
+        import time
+        time.sleep(1.5)
+        webbrowser.open(f"http://localhost:{settings.PORT}")
+
+    threading.Thread(target=_open_browser, daemon=True).start()
+
     uvicorn.run(
         "main:app",
         host=settings.HOST,
