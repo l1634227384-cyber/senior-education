@@ -2,7 +2,10 @@
 高等教育个性化学习资源智能体系统 - FastAPI 主应用
 """
 import asyncio
+import hashlib
+import hmac
 import json
+import secrets
 import uuid
 from datetime import datetime
 from typing import List, Optional, Dict, Any
@@ -42,12 +45,34 @@ async def get_db() -> AsyncSession:
     async with async_session() as session:
         yield session
 
+# ==================== 密码哈希工具 ====================
+# 使用标准库 hashlib.pbkdf2_hmac，避免引入额外依赖（如 passlib/bcrypt 未必在 requirements.txt 中）
+_PBKDF2_ITERATIONS = 260_000
+
+def hash_password(password: str) -> str:
+    """生成 "salt$hash" 格式的密码哈希"""
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), _PBKDF2_ITERATIONS)
+    return f"{salt}${digest.hex()}"
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    """校验密码是否匹配哈希，使用常量时间比较防止时序攻击"""
+    try:
+        salt, hex_digest = password_hash.split("$", 1)
+    except (ValueError, AttributeError):
+        return False
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), _PBKDF2_ITERATIONS)
+    return hmac.compare_digest(digest.hex(), hex_digest)
+
+
 # ==================== 请求/响应模型 ====================
 
 class StudentCreateRequest(BaseModel):
     """创建学生请求"""
     name: str
     student_id: str
+    password: str = Field(min_length=6, description="登录密码，至少6位")
     major: Optional[str] = None
     grade: Optional[str] = None
     university: Optional[str] = None
@@ -205,6 +230,7 @@ async def register_student(request: StudentCreateRequest, db: AsyncSession = Dep
     student = Student(
         student_id=request.student_id,
         name=request.name,
+        password_hash=hash_password(request.password),
         major=request.major,
         grade=request.grade,
         university=request.university
@@ -222,22 +248,51 @@ async def register_student(request: StudentCreateRequest, db: AsyncSession = Dep
 class StudentLoginRequest(BaseModel):
     """登录请求"""
     student_id: str
-    name: str
+    password: str
 
 
 @app.post("/api/students/login")
 async def login_student(request: StudentLoginRequest, db: AsyncSession = Depends(get_db)):
-    """学生登录（验证学号和姓名）"""
+    """学生登录（验证学号和密码）"""
     result = await db.execute(
         select(Student).where(Student.student_id == request.student_id)
     )
     student = result.scalar_one_or_none()
     if not student:
         raise HTTPException(status_code=404, detail="学号不存在，请先注册")
-    if student.name != request.name:
-        raise HTTPException(status_code=403, detail="姓名与学号不匹配")
+
+    if not student.password_hash:
+        raise HTTPException(status_code=403, detail="该账号未设置密码，请联系管理员或重新注册")
+
+    if not verify_password(request.password, student.password_hash):
+        raise HTTPException(status_code=403, detail="密码错误，请重新输入")
 
     return {"status": "success", "student": student_to_dict(student)}
+
+
+class ChangePasswordRequest(BaseModel):
+    """修改密码请求"""
+    student_id: str
+    old_password: str
+    new_password: str = Field(min_length=6, description="新密码，至少6位")
+
+
+@app.post("/api/students/change-password")
+async def change_password(request: ChangePasswordRequest, db: AsyncSession = Depends(get_db)):
+    """修改密码（需验证旧密码）"""
+    result = await db.execute(
+        select(Student).where(Student.student_id == request.student_id)
+    )
+    student = result.scalar_one_or_none()
+    if not student:
+        raise HTTPException(status_code=404, detail="学号不存在")
+
+    if not student.password_hash or not verify_password(request.old_password, student.password_hash):
+        raise HTTPException(status_code=403, detail="原密码错误")
+
+    student.password_hash = hash_password(request.new_password)
+    await db.commit()
+    return {"status": "success", "message": "密码修改成功"}
 
 
 # 保留旧接口兼容

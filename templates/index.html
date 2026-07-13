@@ -66,6 +66,64 @@
             to { opacity: 1; }
         }
 
+        /* ===== 自定义 Toast 通知 ===== */
+        #toastContainer {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .toast {
+            pointer-events: auto;
+            background: var(--bg-card, #fff);
+            color: var(--text, #1a1a2e);
+            border-radius: 14px;
+            padding: 18px 28px;
+            min-width: 240px;
+            max-width: 360px;
+            box-shadow: 0 20px 50px -8px rgba(16,18,38,0.28), 0 0 0 1.5px rgba(0,0,0,0.06);
+            font-size: 15px;
+            font-weight: 500;
+            text-align: center;
+            animation: toastIn 0.25s ease;
+            line-height: 1.6;
+        }
+        .toast.toast-success { border-top: 3px solid #6C63FF; }
+        .toast.toast-error   { border-top: 3px solid #F87171; }
+        .toast.toast-info    { border-top: 3px solid #60A5FA; }
+        .toast-actions {
+            margin-top: 14px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        .toast-actions button {
+            padding: 7px 22px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            background: var(--primary, #6C63FF);
+            color: #fff;
+            transition: opacity 0.15s;
+        }
+        .toast-actions button:hover { opacity: 0.85; }
+        @keyframes toastIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+        @keyframes toastOut {
+            from { opacity: 1; transform: scale(1); }
+            to   { opacity: 0; transform: scale(0.9); }
+        }
+
         /* 导航栏 */
         .navbar {
             background: var(--gradient-brand);
@@ -121,6 +179,20 @@
             border-radius: 50%;
             background: #34D399;
             box-shadow: 0 0 0 3px rgba(52,211,153,0.25);
+        }
+        .navbar .nav-status .dot.ws-connecting {
+            background: #FBBF24;
+            box-shadow: 0 0 0 3px rgba(251,191,36,0.25);
+            animation: ws-pulse 1s infinite;
+        }
+        .navbar .nav-status .dot.ws-disconnected {
+            background: #F87171;
+            box-shadow: 0 0 0 3px rgba(248,113,113,0.25);
+            animation: ws-pulse 1s infinite;
+        }
+        @keyframes ws-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.35; }
         }
         .navbar .nav-btn {
             background: rgba(255,255,255,0.15);
@@ -916,6 +988,30 @@
             background: var(--bg-card);
             box-shadow: 0 0 0 3px var(--primary-soft);
         }
+        /* 密码可见切换 */
+        .pwd-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .pwd-wrapper input {
+            width: 100%;
+            padding-right: 42px !important;
+        }
+        .pwd-toggle {
+            position: absolute;
+            right: 12px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            color: var(--text-light);
+            font-size: 16px;
+            line-height: 1;
+            transition: color 0.2s;
+            user-select: none;
+        }
+        .pwd-toggle:hover { color: var(--primary); }
         .auth-form button {
             padding: 12px;
             border: none;
@@ -953,6 +1049,63 @@
             font-weight: 700;
             box-shadow: var(--shadow-xs);
         }
+
+        /* 修改密码弹窗 */
+        .change-pwd-modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(16,18,38,0.65);
+            backdrop-filter: blur(3px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1100;
+        }
+        .change-pwd-modal.open { display: flex; }
+        .change-pwd-box {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: 32px 28px 24px;
+            width: 360px;
+            max-width: 92vw;
+            box-shadow: 0 30px 60px -12px rgba(16,18,38,0.35);
+            animation: fadeInUp 0.25s ease;
+        }
+        .change-pwd-box h3 {
+            margin: 0 0 18px;
+            font-size: 17px;
+            font-weight: 700;
+        }
+        .change-pwd-box .auth-form { gap: 12px; }
+        .change-pwd-footer {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .change-pwd-footer button { flex: 1; }
+
+        /* 修改密码 & 退出按钮组 */
+        .account-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .account-actions button {
+            flex: 1;
+            padding: 7px 0;
+            font-size: 13px;
+            border-radius: var(--radius-sm);
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-change-pwd {
+            background: var(--bg-sunken);
+            color: var(--primary);
+            border: 1.5px solid var(--primary-soft) !important;
+        }
+        .btn-change-pwd:hover { background: var(--primary-soft); }
 
         /* 模态框 */
         .modal-overlay {
@@ -1172,7 +1325,10 @@
             <!-- 登录表单 -->
             <div id="loginForm" class="auth-form">
                 <input type="text" id="loginStudentId" placeholder="学号" autocomplete="username">
-                <input type="text" id="loginStudentName" placeholder="姓名" autocomplete="name">
+                <div class="pwd-wrapper">
+                    <input type="password" id="loginPassword" placeholder="密码" autocomplete="current-password">
+                    <button type="button" class="pwd-toggle" onclick="togglePwd('loginPassword', this)" title="显示/隐藏密码">👁</button>
+                </div>
                 <button class="btn btn-primary" onclick="loginStudent()">登录</button>
             </div>
             
@@ -1180,9 +1336,41 @@
             <div id="registerForm" class="auth-form" style="display:none;">
                 <input type="text" id="registerStudentId" placeholder="学号" autocomplete="username">
                 <input type="text" id="registerStudentName" placeholder="姓名" autocomplete="name">
+                <div class="pwd-wrapper">
+                    <input type="password" id="registerPassword" placeholder="设置密码（至少6位）" autocomplete="new-password">
+                    <button type="button" class="pwd-toggle" onclick="togglePwd('registerPassword', this)" title="显示/隐藏密码">👁</button>
+                </div>
                 <input type="text" id="registerStudentMajor" placeholder="专业（可选）">
                 <input type="text" id="registerStudentGrade" placeholder="年级（可选）">
                 <button class="btn btn-success" onclick="registerStudent()">注册</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 自定义 Toast 容器 -->
+    <div id="toastContainer"></div>
+
+    <!-- 修改密码弹窗 -->
+    <div class="change-pwd-modal" id="changePwdModal">
+        <div class="change-pwd-box">
+            <h3>🔒 修改密码</h3>
+            <div class="auth-form">
+                <div class="pwd-wrapper">
+                    <input type="password" id="cpOldPwd" placeholder="原密码" autocomplete="current-password">
+                    <button type="button" class="pwd-toggle" onclick="togglePwd('cpOldPwd', this)" title="显示/隐藏密码">👁</button>
+                </div>
+                <div class="pwd-wrapper">
+                    <input type="password" id="cpNewPwd" placeholder="新密码（至少6位）" autocomplete="new-password">
+                    <button type="button" class="pwd-toggle" onclick="togglePwd('cpNewPwd', this)" title="显示/隐藏密码">👁</button>
+                </div>
+                <div class="pwd-wrapper">
+                    <input type="password" id="cpNewPwd2" placeholder="确认新密码" autocomplete="new-password">
+                    <button type="button" class="pwd-toggle" onclick="togglePwd('cpNewPwd2', this)" title="显示/隐藏密码">👁</button>
+                </div>
+            </div>
+            <div class="change-pwd-footer">
+                <button class="btn btn-primary" onclick="submitChangePassword()">确认修改</button>
+                <button class="btn btn-secondary" onclick="closeChangePwdModal()">取消</button>
             </div>
         </div>
     </div>
@@ -1194,7 +1382,7 @@
             <span>智能学习系统<span class="logo-sub">· 高等教育个性化学习资源智能体</span></span>
         </div>
         <div class="nav-links">
-            <span class="nav-status"><span class="dot"></span>智能体在线</span>
+            <span class="nav-status"><span class="dot" id="wsStatusDot"></span><span id="wsStatusText">智能体在线</span></span>
         </div>
     </nav>
 
@@ -1208,7 +1396,10 @@
                     <div class="student-avatar" id="displayStudentAvatar">学</div>
                     <div class="student-name" id="displayStudentName">加载中...</div>
                     <div class="student-details" id="displayStudentDetails">加载中...</div>
-                    <button class="logout-btn" onclick="logout()">🚪 退出登录</button>
+                    <div class="account-actions">
+                        <button class="btn-change-pwd" onclick="openChangePwdModal()">🔒 修改密码</button>
+                        <button class="logout-btn" onclick="logout()">🚪 退出</button>
+                    </div>
                 </div>
                 
                 <div id="profileDisplay" class="profile-card" style="display:none;">
@@ -1377,15 +1568,18 @@
 
         // 切换登录/注册标签
         function switchAuthTab(tab) {
-            document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
-            
+            if (event && event.target) {
+                document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+                event.target.classList.add('active');
+            }
             if (tab === 'login') {
                 document.getElementById('loginForm').style.display = 'flex';
                 document.getElementById('registerForm').style.display = 'none';
+                clearLoginForm();
             } else {
                 document.getElementById('loginForm').style.display = 'none';
                 document.getElementById('registerForm').style.display = 'flex';
+                clearRegisterForm();
             }
         }
 
@@ -1398,15 +1592,89 @@
             document.getElementById('loadingOverlay').style.display = 'none';
         }
 
+        // ========== 自定义 Toast ==========
+        /**
+         * showToast(msg, type='success'|'error'|'info', duration=2500)
+         * 居中显示自动消失的通知，无需用户点击
+         */
+        function showToast(msg, type = 'success', duration = 2500) {
+            const container = document.getElementById('toastContainer');
+            const el = document.createElement('div');
+            el.className = `toast toast-${type}`;
+            el.textContent = msg;
+            container.appendChild(el);
+            setTimeout(() => {
+                el.style.animation = 'toastOut 0.22s ease forwards';
+                setTimeout(() => el.remove(), 230);
+            }, duration);
+        }
+
+        /**
+         * showAlert(msg, type) — 需要用户点「确定」的居中提示框（替换 alert）
+         */
+        function showAlert(msg, type = 'info') {
+            return new Promise(resolve => {
+                const container = document.getElementById('toastContainer');
+                const el = document.createElement('div');
+                el.className = `toast toast-${type}`;
+                el.innerHTML = `<div>${msg}</div><div class="toast-actions"><button id="toastOkBtn">确定</button></div>`;
+                container.appendChild(el);
+                el.querySelector('#toastOkBtn').addEventListener('click', () => {
+                    el.style.animation = 'toastOut 0.22s ease forwards';
+                    setTimeout(() => { el.remove(); resolve(); }, 220);
+                });
+            });
+        }
+
+        // 密码显示/隐藏切换
+        function togglePwd(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const isHidden = input.type === 'password';
+            input.type = isHidden ? 'text' : 'password';
+            btn.textContent = isHidden ? '🙈' : '👁';
+        }
+
+        // 重置密码框为隐藏状态
+        function resetPwdVisibility(...ids) {
+            ids.forEach(id => {
+                const input = document.getElementById(id);
+                if (!input) return;
+                input.type = 'password';
+                const btn = input.parentElement.querySelector('.pwd-toggle');
+                if (btn) btn.textContent = '👁';
+            });
+        }
+
+        // 清空注册表单
+        function clearRegisterForm() {
+            ['registerStudentId','registerStudentName','registerPassword',
+             'registerStudentMajor','registerStudentGrade'].forEach(id => {
+                document.getElementById(id).value = '';
+            });
+            resetPwdVisibility('registerPassword');
+        }
+
+        // 清空登录表单
+        function clearLoginForm() {
+            document.getElementById('loginStudentId').value = '';
+            document.getElementById('loginPassword').value = '';
+            resetPwdVisibility('loginPassword');
+        }
+
         // 注册学生
         async function registerStudent() {
             const studentId = document.getElementById('registerStudentId').value.trim();
             const name = document.getElementById('registerStudentName').value.trim();
+            const password = document.getElementById('registerPassword').value;
             const major = document.getElementById('registerStudentMajor').value.trim();
             const grade = document.getElementById('registerStudentGrade').value.trim();
 
-            if (!studentId || !name) {
-                alert('请填写学号和姓名');
+            if (!studentId || !name || !password) {
+                showToast('请填写学号、姓名和密码', 'error');
+                return;
+            }
+            if (password.length < 6) {
+                showToast('密码至少需要6位', 'error');
                 return;
             }
 
@@ -1415,23 +1683,22 @@
                 const resp = await fetch('/api/students/register', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({student_id: studentId, name, major, grade})
+                    body: JSON.stringify({student_id: studentId, name, password, major, grade})
                 });
                 const data = await resp.json();
                 if (!resp.ok) {
-                    alert('❌ ' + (data.detail || '注册失败'));
+                    showToast(data.detail || '注册失败', 'error');
                     return;
                 }
 
                 currentStudentId = studentId;
-                alert(`✅ 学生 ${name} 注册成功！`);
-                
-                // 隐藏登录模态框
+                clearRegisterForm();
+
+                // 先隐藏登录模态框，再显示提示
                 document.getElementById('authModal').style.display = 'none';
-                
-                // 显示学生信息
                 displayStudentInfo(data.student);
-                
+                showToast(`🎉 ${name} 注册成功，欢迎加入！`, 'success', 3000);
+
                 // 建立 WebSocket 连接
                 connectWebSocket(studentId);
 
@@ -1442,7 +1709,7 @@
                 await loadLearningProgress();
                 await loadConversationList();
             } catch (err) {
-                alert('注册失败: ' + err.message);
+                showToast('注册失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -1451,10 +1718,10 @@
         // 登录学生
         async function loginStudent() {
             const studentId = document.getElementById('loginStudentId').value.trim();
-            const name = document.getElementById('loginStudentName').value.trim();
+            const password = document.getElementById('loginPassword').value;
 
-            if (!studentId || !name) {
-                alert('请填写学号和姓名');
+            if (!studentId || !password) {
+                showToast('请填写学号和密码', 'error');
                 return;
             }
 
@@ -1463,23 +1730,21 @@
                 const resp = await fetch('/api/students/login', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({student_id: studentId, name})
+                    body: JSON.stringify({student_id: studentId, password})
                 });
                 const data = await resp.json();
                 if (!resp.ok) {
-                    alert('❌ ' + (data.detail || '登录失败'));
+                    showToast(data.detail || '登录失败', 'error');
                     return;
                 }
 
                 currentStudentId = studentId;
-                
-                // 隐藏登录模态框
+                clearLoginForm();
+
+                // 先隐藏登录模态框，再显示提示，避免遮挡
                 document.getElementById('authModal').style.display = 'none';
-                
-                // 显示学生信息
                 displayStudentInfo(data.student);
-                
-                alert(`✅ 欢迎回来，${data.student.name}！`);
+                showToast(`欢迎回来，${data.student.name}！`, 'success', 3000);
 
                 // 建立 WebSocket 连接
                 connectWebSocket(studentId);
@@ -1491,7 +1756,65 @@
                 await loadLearningProgress();
                 await loadConversationList();
             } catch (err) {
-                alert('登录失败: ' + err.message);
+                showToast('登录失败: ' + err.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ========== 修改密码 ==========
+        function openChangePwdModal() {
+            document.getElementById('cpOldPwd').value = '';
+            document.getElementById('cpNewPwd').value = '';
+            document.getElementById('cpNewPwd2').value = '';
+            resetPwdVisibility('cpOldPwd', 'cpNewPwd', 'cpNewPwd2');
+            document.getElementById('changePwdModal').classList.add('open');
+        }
+        function closeChangePwdModal() {
+            document.getElementById('changePwdModal').classList.remove('open');
+        }
+        async function submitChangePassword() {
+            const oldPwd = document.getElementById('cpOldPwd').value;
+            const newPwd = document.getElementById('cpNewPwd').value;
+            const newPwd2 = document.getElementById('cpNewPwd2').value;
+
+            if (!oldPwd || !newPwd || !newPwd2) {
+                showToast('请填写所有密码字段', 'error');
+                return;
+            }
+            if (newPwd.length < 6) {
+                showToast('新密码至少需要6位', 'error');
+                return;
+            }
+            if (newPwd !== newPwd2) {
+                showToast('两次输入的新密码不一致', 'error');
+                return;
+            }
+            if (!currentStudentId) {
+                showToast('请先登录', 'error');
+                return;
+            }
+
+            showLoading('修改密码中...');
+            try {
+                const resp = await fetch('/api/students/change-password', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        student_id: currentStudentId,
+                        old_password: oldPwd,
+                        new_password: newPwd
+                    })
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    showToast(data.detail || '修改失败', 'error');
+                    return;
+                }
+                closeChangePwdModal();
+                showToast('密码修改成功！下次登录请使用新密码', 'success', 3000);
+            } catch (err) {
+                showToast('修改密码失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -1524,11 +1847,8 @@
                 evaluations = [];
                 currentConversationId = null;
                 
-                // 关闭 WebSocket 连接
-                if (ws) {
-                    ws.close();
-                    ws = null;
-                }
+                // 关闭 WebSocket 连接（主动关闭，不触发自动重连）
+                closeWebSocket();
                 
                 // 清空显示
                 document.getElementById('studentInfoDisplay').style.display = 'none';
@@ -1573,6 +1893,14 @@
                     </div>
                 `;
                 
+                // 清空表单输入框并切回登录 Tab
+                clearLoginForm();
+                clearRegisterForm();
+                switchAuthTab('login');
+                document.querySelectorAll('.auth-tab').forEach((t, i) => {
+                    t.classList.toggle('active', i === 0);
+                });
+
                 // 显示登录模态框
                 document.getElementById('authModal').style.display = 'flex';
             }
@@ -2054,13 +2382,56 @@
 
         // WebSocket 连接管理
         let ws = null;
+        let wsReconnectTimer = null;
+        let wsReconnectAttempts = 0;
+        let wsIntentionalClose = false;   // 主动登出/关闭时置 true，避免触发自动重连
+        let wsCurrentStudentId = null;
+        const WS_RECONNECT_BASE_DELAY = 1000;   // 首次重连延迟 1s
+        const WS_RECONNECT_MAX_DELAY = 20000;   // 最长重连间隔 20s
+
+        // 更新导航栏的连接状态指示灯
+        function updateWsStatus(state) {
+            const dot = document.getElementById('wsStatusDot');
+            const text = document.getElementById('wsStatusText');
+            if (!dot || !text) return;
+            dot.classList.remove('ws-connecting', 'ws-disconnected');
+            if (state === 'connected') {
+                text.textContent = '智能体在线';
+            } else if (state === 'connecting') {
+                dot.classList.add('ws-connecting');
+                text.textContent = '连接中...';
+            } else {
+                dot.classList.add('ws-disconnected');
+                text.textContent = '连接已断开，正在重连...';
+            }
+        }
 
         function connectWebSocket(studentId) {
-            if (ws) ws.close();
-            ws = new WebSocket(`ws://${location.host}/ws/chat/${studentId}`);
+            wsCurrentStudentId = studentId;
+            wsIntentionalClose = false;
+            if (wsReconnectTimer) {
+                clearTimeout(wsReconnectTimer);
+                wsReconnectTimer = null;
+            }
+            if (ws) {
+                ws.onclose = null; // 避免旧连接的 onclose 触发多余的重连逻辑
+                ws.close();
+            }
+
+            updateWsStatus('connecting');
+
+            // 根据当前页面协议动态选择 ws:// 或 wss://，避免 HTTPS 页面下的混合内容拦截
+            const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${wsProtocol}//${location.host}/ws/chat/${studentId}`);
 
             ws.onopen = async () => {
                 console.log('WebSocket 已连接');
+                const isFirstConnect = wsReconnectAttempts === 0;
+                wsReconnectAttempts = 0;
+                updateWsStatus('connected');
+                if (!isFirstConnect) {
+                    addChatMessage('assistant', '✅ 网络连接已恢复，可以继续对话。');
+                }
                 // 加载活跃对话的历史消息
                 try {
                     // 先确保对话列表已加载，获取当前活跃对话ID
@@ -2128,14 +2499,54 @@
             };
 
             ws.onerror = () => {
-                addChatMessage('assistant', '连接出错，请刷新页面重试');
+                // onerror 之后浏览器一定会紧接着触发 onclose，重连逻辑统一放在 onclose 里处理，
+                // 这里只负责给用户一个即时反馈
                 hideLoading();
             };
 
             ws.onclose = () => {
                 console.log('WebSocket 断开');
                 ws = null;
+                if (wsIntentionalClose) {
+                    // 主动登出，不重连
+                    return;
+                }
+                updateWsStatus('disconnected');
+                scheduleWsReconnect();
             };
+        }
+
+        // 断线后按指数退避策略自动重连（1s → 2s → 4s → ... 最长20s），网络恢复后自动续上
+        function scheduleWsReconnect() {
+            if (!wsCurrentStudentId || wsIntentionalClose) return;
+            if (wsReconnectTimer) return; // 已经有一个重连任务在排队
+
+            const delay = Math.min(WS_RECONNECT_BASE_DELAY * Math.pow(2, wsReconnectAttempts), WS_RECONNECT_MAX_DELAY);
+            wsReconnectAttempts++;
+            console.log(`WebSocket 将在 ${delay}ms 后尝试第 ${wsReconnectAttempts} 次重连`);
+
+            wsReconnectTimer = setTimeout(() => {
+                wsReconnectTimer = null;
+                if (wsIntentionalClose || !wsCurrentStudentId) return;
+                connectWebSocket(wsCurrentStudentId);
+            }, delay);
+        }
+
+        // 主动断开连接（登出时调用），避免触发自动重连
+        function closeWebSocket() {
+            wsIntentionalClose = true;
+            wsCurrentStudentId = null;
+            wsReconnectAttempts = 0;
+            if (wsReconnectTimer) {
+                clearTimeout(wsReconnectTimer);
+                wsReconnectTimer = null;
+            }
+            if (ws) {
+                ws.onclose = null;
+                ws.close();
+                ws = null;
+            }
+            updateWsStatus('connected'); // 恢复指示灯为默认样式，避免登出后仍显示"已断开"
         }
 
         // 发送消息
@@ -2145,7 +2556,7 @@
 
             if (!message) return;
             if (!currentStudentId) {
-                alert('请先登录');
+                showToast('请先登录', 'error');
                 document.getElementById('authModal').style.display = 'flex';
                 return;
             }
@@ -2194,11 +2605,13 @@
             // 确保 WebSocket 已连接
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 connectWebSocket(currentStudentId);
-                // 等待连接建立
+                // 等待连接建立（用 addEventListener 而不是覆盖 ws.onopen/onerror，
+                // 这样不会破坏 connectWebSocket 内部设置的状态指示灯/重连计数逻辑）
+                const wsToWaitFor = ws;
                 await new Promise((resolve, reject) => {
                     const timeout = setTimeout(() => reject(new Error('连接超时')), 5000);
-                    ws.onopen = () => { clearTimeout(timeout); resolve(); };
-                    ws.onerror = () => { clearTimeout(timeout); reject(new Error('连接失败')); };
+                    wsToWaitFor.addEventListener('open', () => { clearTimeout(timeout); resolve(); }, { once: true });
+                    wsToWaitFor.addEventListener('error', () => { clearTimeout(timeout); reject(new Error('连接失败')); }, { once: true });
                 });
             }
 
@@ -2614,7 +3027,7 @@
 
                 modal.style.display = 'flex';
             } catch (err) {
-                alert('加载资源失败: ' + err.message);
+                showToast('加载资源失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -2678,7 +3091,7 @@
                 });
                 const data = await resp.json();
                 if (!resp.ok) {
-                    alert('批阅失败: ' + (data.detail || '未知错误'));
+                    showToast(data.detail || '批阅失败', 'error');
                     return;
                 }
 
@@ -2708,12 +3121,12 @@
 
                 // 根据成绩更新画像（如果得分率较低，标记薄弱知识点）
                 if (result.score_rate < 60) {
-                    alert('⚠️ 本次练习得分率较低，建议重新学习相关知识点后再练习。');
+                    showToast('本次练习得分率较低，建议重新学习相关知识点后再练习。', 'info', 4000);
                 } else if (result.score_rate >= 90) {
-                    alert('🎉 恭喜！本次练习表现优秀！');
+                    showToast('恭喜！本次练习表现优秀！', 'success', 3000);
                 }
             } catch (err) {
-                alert('批阅失败: ' + err.message);
+                showToast('批阅失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -2753,7 +3166,7 @@
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             } catch (err) {
-                alert('导出失败: ' + err.message);
+                showToast('导出失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -2929,10 +3342,10 @@
                         rating: rating
                     })
                 });
-                alert('✅ 感谢你的反馈！');
+                showToast('感谢你的反馈！', 'success', 2500);
                 document.getElementById('resourceModal').style.display = 'none';
             } catch (err) {
-                alert('反馈提交失败');
+                showToast('反馈提交失败', 'error');
             }
         }
 
@@ -3055,7 +3468,7 @@
             try {
                 const resp = await fetch(`/api/students/${currentStudentId}/conversation/${convId}`);
                 if (!resp.ok) {
-                    alert('对话加载失败');
+                    showToast('对话加载失败', 'error');
                     return;
                 }
                 const data = await resp.json();
@@ -3091,7 +3504,7 @@
                 // 切换到对话标签
                 switchTab('chat');
             } catch (err) {
-                alert('加载对话失败: ' + err.message);
+                showToast('加载对话失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -3100,7 +3513,7 @@
         // 创建新对话
         async function createNewConversation() {
             if (!currentStudentId) {
-                alert('请先登录');
+                showToast('请先登录', 'info');
                 return;
             }
 
@@ -3111,7 +3524,7 @@
                 });
                 const data = await resp.json();
                 if (!resp.ok) {
-                    alert('创建失败');
+                    showToast('创建失败', 'error');
                     return;
                 }
                 
@@ -3136,7 +3549,7 @@
                 // 切换到对话标签
                 switchTab('chat');
             } catch (err) {
-                alert('创建失败: ' + err.message);
+                showToast('创建失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -3152,7 +3565,7 @@
                     method: 'DELETE'
                 });
                 if (!resp.ok) {
-                    alert('删除失败');
+                    showToast('删除失败', 'error');
                     return;
                 }
                 
@@ -3175,7 +3588,7 @@
                 // 刷新对话列表
                 await loadConversationList();
             } catch (err) {
-                alert('删除失败: ' + err.message);
+                showToast('删除失败: ' + err.message, 'error');
             }
         }
 
@@ -3200,7 +3613,7 @@
         // 快速生成资源
         async function quickGenerate() {
             if (!currentStudentId) {
-                alert('请先登录');
+                showToast('请先登录', 'error');
                 document.getElementById('authModal').style.display = 'flex';
                 return;
             }
@@ -3218,7 +3631,7 @@
         // 快速评估
         async function quickEvaluate() {
             if (!currentStudentId) {
-                alert('请先登录');
+                showToast('请先登录', 'error');
                 document.getElementById('authModal').style.display = 'flex';
                 return;
             }
@@ -3279,7 +3692,7 @@
                 container.innerHTML = html;
                 switchTab('evaluation');
             } catch (err) {
-                alert('评估失败: ' + err.message);
+                showToast('评估失败: ' + err.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -3288,7 +3701,7 @@
         // 快速规划路径
         async function quickPlanPath() {
             if (!currentStudentId) {
-                alert('请先登录');
+                showToast('请先登录', 'error');
                 document.getElementById('authModal').style.display = 'flex';
                 return;
             }
@@ -3307,7 +3720,7 @@
                     renderLearningPath();
                     switchTab('path');
                 } catch (err) {
-                    alert('路径规划失败: ' + err.message);
+                    showToast('路径规划失败: ' + err.message, 'error');
                 } finally {
                     hideLoading();
                 }
