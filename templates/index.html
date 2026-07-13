@@ -124,6 +124,75 @@
             to   { opacity: 0; transform: scale(0.9); }
         }
 
+        /* ===== 自定义 confirm / prompt 弹窗 ===== */
+        .dialog-mask {
+            position: fixed;
+            inset: 0;
+            background: rgba(16,18,38,0.55);
+            backdrop-filter: blur(2px);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.18s ease;
+        }
+        .dialog-box {
+            background: var(--bg-card, #fff);
+            border-radius: 16px;
+            padding: 28px 28px 22px;
+            width: 360px;
+            max-width: 90vw;
+            box-shadow: 0 24px 56px -8px rgba(16,18,38,0.32), 0 0 0 1.5px rgba(0,0,0,0.06);
+            animation: toastIn 0.22s ease;
+        }
+        .dialog-box .dialog-msg {
+            font-size: 15px;
+            line-height: 1.65;
+            color: var(--text, #1a1a2e);
+            margin-bottom: 20px;
+            white-space: pre-wrap;
+        }
+        .dialog-box input.dialog-input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1.5px solid var(--border, #e2e4f0);
+            border-radius: 8px;
+            font-size: 14px;
+            background: var(--bg-sunken, #f5f6fb);
+            outline: none;
+            margin-bottom: 18px;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        .dialog-box input.dialog-input:focus {
+            border-color: var(--primary, #6C63FF);
+            background: var(--bg-card, #fff);
+        }
+        .dialog-btns {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        .dialog-btns button {
+            padding: 8px 22px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 13.5px;
+            font-weight: 600;
+            transition: opacity 0.15s;
+        }
+        .dialog-btn-ok {
+            background: var(--primary, #6C63FF);
+            color: #fff;
+        }
+        .dialog-btn-ok:hover { opacity: 0.87; }
+        .dialog-btn-cancel {
+            background: var(--bg-sunken, #f0f1f8);
+            color: var(--text, #1a1a2e);
+        }
+        .dialog-btn-cancel:hover { background: var(--border, #e2e4f0); }
+
         /* 导航栏 */
         .navbar {
             background: var(--gradient-brand);
@@ -1592,6 +1661,53 @@
             document.getElementById('loadingOverlay').style.display = 'none';
         }
 
+        // ========== 自定义 confirm / prompt ==========
+
+        /** showConfirm(msg) → Promise<boolean> */
+        function showConfirm(msg) {
+            return new Promise(resolve => {
+                const mask = document.createElement('div');
+                mask.className = 'dialog-mask';
+                mask.innerHTML = `
+                    <div class="dialog-box">
+                        <div class="dialog-msg">${msg}</div>
+                        <div class="dialog-btns">
+                            <button class="dialog-btn-cancel" id="_dlgCancel">取消</button>
+                            <button class="dialog-btn-ok" id="_dlgOk">确定</button>
+                        </div>
+                    </div>`;
+                document.body.appendChild(mask);
+                const close = val => { mask.remove(); resolve(val); };
+                mask.querySelector('#_dlgOk').onclick = () => close(true);
+                mask.querySelector('#_dlgCancel').onclick = () => close(false);
+            });
+        }
+
+        /** showPrompt(msg, defaultVal='') → Promise<string|null> */
+        function showPrompt(msg, defaultVal = '') {
+            return new Promise(resolve => {
+                const mask = document.createElement('div');
+                mask.className = 'dialog-mask';
+                mask.innerHTML = `
+                    <div class="dialog-box">
+                        <div class="dialog-msg">${msg}</div>
+                        <input class="dialog-input" id="_dlgInput" type="text" value="${defaultVal}">
+                        <div class="dialog-btns">
+                            <button class="dialog-btn-cancel" id="_dlgCancel">取消</button>
+                            <button class="dialog-btn-ok" id="_dlgOk">确定</button>
+                        </div>
+                    </div>`;
+                document.body.appendChild(mask);
+                const input = mask.querySelector('#_dlgInput');
+                input.focus();
+                input.select();
+                const close = val => { mask.remove(); resolve(val); };
+                mask.querySelector('#_dlgOk').onclick = () => close(input.value.trim() || null);
+                mask.querySelector('#_dlgCancel').onclick = () => close(null);
+                input.onkeydown = e => { if (e.key === 'Enter') close(input.value.trim() || null); if (e.key === 'Escape') close(null); };
+            });
+        }
+
         // ========== 自定义 Toast ==========
         /**
          * showToast(msg, type='success'|'error'|'info', duration=2500)
@@ -1838,9 +1954,9 @@
         }
 
         // 退出登录
-        function logout() {
-            if (confirm('确定要退出登录吗？')) {
-                currentStudentId = null;
+        async function logout() {
+            if (!await showConfirm('确定要退出登录吗？')) return;
+            currentStudentId = null;
                 currentProfile = null;
                 allResources = [];
                 learningPath = null;
@@ -1903,7 +2019,6 @@
 
                 // 显示登录模态框
                 document.getElementById('authModal').style.display = 'flex';
-            }
         }
 
         // 加载学习进度
@@ -2721,7 +2836,7 @@
                     normalize(r.subject) === normalize(subject) && normalize(r.topic) === normalize(topic)
                 );
                 if (existing.length > 0) {
-                    const wantsNew = confirm(
+                    const wantsNew = await showConfirm(
                         `你之前已经生成过「${subject} - ${topic}」的学习资源（共 ${existing.length} 个），\n` +
                         `是否需要重新生成一份新的？\n\n` +
                         `点击"确定"重新生成；点击"取消"直接查看已有资源。`
@@ -3558,7 +3673,7 @@
         // 删除对话
         async function deleteConversation(convId) {
             if (!currentStudentId) return;
-            if (!confirm('确定要删除这个对话吗？此操作不可撤销。')) return;
+            if (!await showConfirm('确定要删除这个对话吗？此操作不可撤销。')) return;
 
             try {
                 const resp = await fetch(`/api/students/${currentStudentId}/conversation/${convId}`, {
@@ -3617,8 +3732,9 @@
                 document.getElementById('authModal').style.display = 'flex';
                 return;
             }
-            const subject = prompt('请输入科目（如：数据结构）：', '数据结构');
-            const topic = prompt('请输入主题（如：二叉树）：', '二叉树');
+            const subject = await showPrompt('请输入科目（如：数据结构）：', '数据结构');
+            if (!subject) return;
+            const topic = await showPrompt('请输入主题（如：二叉树）：', '二叉树');
             if (subject && topic) {
                 switchTab('chat');
                 addChatMessage('user', `生成 ${subject} ${topic} 的学习资料`);
@@ -3705,8 +3821,9 @@
                 document.getElementById('authModal').style.display = 'flex';
                 return;
             }
-            const subject = prompt('请输入科目：', '数据结构');
-            const topic = prompt('请输入主题：', '二叉树');
+            const subject = await showPrompt('请输入科目：', '数据结构');
+            if (!subject) return;
+            const topic = await showPrompt('请输入主题：', '二叉树');
             if (subject && topic) {
                 showLoading('规划学习路径...');
                 try {
