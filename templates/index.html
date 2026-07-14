@@ -3206,7 +3206,17 @@
                 });
                 const data = await resp.json();
                 if (!resp.ok) {
-                    showToast(data.detail || '批阅失败', 'error');
+                    let errMsg = '批阅失败';
+                    if (data.detail) {
+                        if (typeof data.detail === 'string') {
+                            errMsg = data.detail;
+                        } else if (Array.isArray(data.detail)) {
+                            errMsg = data.detail.map(e => e.msg || JSON.stringify(e)).join('; ');
+                        } else {
+                            errMsg = JSON.stringify(data.detail);
+                        }
+                    }
+                    showToast(errMsg, 'error');
                     return;
                 }
 

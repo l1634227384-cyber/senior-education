@@ -123,7 +123,6 @@ class ResourceFeedbackRequest(BaseModel):
 
 class ExerciseGradeRequest(BaseModel):
     """习题批阅请求"""
-    resource_id: str
     answers: Dict[str, str]  # {question_id: student_answer}
 
 
@@ -1081,6 +1080,21 @@ async def detect_chat_intent(request: ChatIntentRequest, db: AsyncSession = Depe
             subject_topic = _extract_subject_topic(message)
             if subject_topic:
                 subject, topic = subject_topic
+
+        # 优先信任已知主题词的整体匹配结果，避免 LLM 把复合词按字符拆开
+        # （例如把"数字逻辑"拆成 subject="数"、topic="字逻辑"）
+        known = _match_known_topic(message)
+        if known:
+            subject, topic = known
+        # 兜底：如果 subject/topic 疑似被拆得过碎（单字符），且拼接后
+        # 恰好是原文的连续子串，说明这是一次错误的切分，改用规则提取兜底
+        elif (len(subject) <= 1 or len(topic) <= 1) and (subject + topic) in message:
+            subject_topic = _extract_subject_topic(message)
+            if subject_topic:
+                subject, topic = subject_topic
+            else:
+                subject, topic = "计算机科学", subject + topic
+
         return {
             "intent": "generate_resources",
             "subject": subject,
@@ -1096,9 +1110,38 @@ async def detect_chat_intent(request: ChatIntentRequest, db: AsyncSession = Depe
     }
 
 
+# 已知的完整主题词 -> 所属科目。这些词必须作为整体出现，
+# 绝不能被正则或 LLM 按字符拆开（如"数字逻辑"被拆成"数"+"字逻辑"）。
+# 按词长从长到短排列，避免短词提前命中长词的子串（如"数据"命中"数据结构"）。
+KNOWN_TOPICS = {
+    "数据结构与算法": "计算机科学", "计算机组成原理": "计算机科学", "计算机网络": "计算机科学",
+    "操作系统": "计算机科学", "编译原理": "计算机科学", "数字逻辑": "计算机科学",
+    "数字电路": "计算机科学", "离散数学": "计算机科学", "软件工程": "计算机科学",
+    "数据结构": "数据结构", "数据库": "数据库系统", "算法设计": "算法设计与分析",
+    "回溯法": "算法设计与分析", "动态规划": "算法设计与分析", "贪心算法": "算法设计与分析",
+    "二叉树": "数据结构", "链表": "数据结构", "哈希表": "数据结构",
+    "微积分": "高等数学", "线性代数": "高等数学", "概率论": "高等数学", "数理统计": "高等数学",
+    "Python": "程序设计", "Java": "程序设计", "C++": "程序设计",
+}
+_KNOWN_TOPICS_SORTED = sorted(KNOWN_TOPICS.keys(), key=len, reverse=True)
+
+
+def _match_known_topic(message: str) -> Optional[tuple]:
+    """在消息中查找已知的完整主题词（整体匹配，不做拆分）"""
+    for topic in _KNOWN_TOPICS_SORTED:
+        if topic in message:
+            return (KNOWN_TOPICS[topic], topic)
+    return None
+
+
 def _extract_subject_topic(message: str) -> Optional[tuple]:
     """从消息中提取科目和主题"""
     import re
+
+    # 0. 优先整体匹配已知主题词，避免被后续正则按字符拆开
+    known = _match_known_topic(message)
+    if known:
+        return known
 
     # 常见模式："给我XXX的YYY资料" -> subject=XXX, topic=YYY
     patterns = [
@@ -1117,14 +1160,7 @@ def _extract_subject_topic(message: str) -> Optional[tuple]:
     simple = re.search(r'(?:给我|我要|帮我|生成)\s*(\S+?)\s*(?:的)?\s*(?:学习资料|资料|课件|讲义)', message)
     if simple:
         topic = simple.group(1)
-        # 尝试推断科目
-        subject_map = {
-            "回溯法": "算法设计与分析", "动态规划": "算法设计与分析", "贪心": "算法设计与分析",
-            "二叉树": "数据结构", "链表": "数据结构", "图": "数据结构",
-            "微积分": "高等数学", "线性代数": "高等数学", "概率论": "高等数学",
-            "Python": "程序设计", "Java": "程序设计", "C++": "程序设计",
-        }
-        subject = subject_map.get(topic, "计算机科学")
+        subject = KNOWN_TOPICS.get(topic, "计算机科学")
         return (subject, topic)
 
     return None
