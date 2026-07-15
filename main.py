@@ -1569,16 +1569,8 @@ async def websocket_chat(websocket: WebSocket, student_id: str):
         conv = conv_result.scalar_one_or_none()
         
         if not conv:
-            # 尝试获取最近一次对话
-            conv_result = await db.execute(
-                select(Conversation).where(
-                    Conversation.student_id == student.id
-                ).order_by(Conversation.updated_at.desc()).limit(1)
-            )
-            conv = conv_result.scalar_one_or_none()
-        
-        if not conv:
-            # 创建新对话
+            # 当前没有活跃会话时创建唯一新会话
+            # 前端不会再提前创建，避免首次提问产生重复对话
             conv = Conversation(
                 student_id=student.id,
                 session_id=str(uuid.uuid4()),

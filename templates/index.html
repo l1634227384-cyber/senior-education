@@ -2831,19 +2831,8 @@
             // 通过 WebSocket 发送消息，类型已由意图识别自动判定
             const wsType = detectedType;
 
-            // 如果没有当前对话ID，先创建一个新对话
-            if (!currentConversationId) {
-                try {
-                    const resp = await fetch(`/api/students/${currentStudentId}/conversation-new`, { method: 'POST' });
-                    const data = await resp.json();
-                    if (data.conversation) {
-                        currentConversationId = data.conversation.id;
-                        await loadConversationList();
-                    }
-                } catch (e) {
-                    console.log('创建新对话失败:', e);
-                }
-            }
+            // 对话由后端 WebSocket 自动创建，前端不主动创建
+            // 避免新账号第一次发送消息时产生重复会话
 
             ws.send(JSON.stringify({ message, type: wsType, conversation_id: currentConversationId }));
         }
