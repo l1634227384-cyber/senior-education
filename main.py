@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -24,7 +24,7 @@ from agents import multi_agent_system, LLMClient
 
 from models import (
     init_db, get_session_direct, async_session, Student, StudentProfile, LearningResource,
-    ResourceFeedback, LearningPath, EvaluationResult, Conversation
+    ResourceFeedback, LearningPath, EvaluationResult, Conversation, LearningRecord
 )
 # 创建FastAPI应用
 app = FastAPI(
@@ -292,6 +292,38 @@ async def change_password(request: ChangePasswordRequest, db: AsyncSession = Dep
     student.password_hash = hash_password(request.new_password)
     await db.commit()
     return {"status": "success", "message": "密码修改成功"}
+
+
+class DeleteAccountRequest(BaseModel):
+    """注销账户请求"""
+    password: str = Field(description="当前登录密码，用于二次确认")
+
+
+@app.delete("/api/students/{student_id}/account")
+async def delete_account(student_id: str, request: DeleteAccountRequest, db: AsyncSession = Depends(get_db)):
+    """注销账户：验证密码后，永久删除该学生及其全部关联数据（不可恢复）"""
+    result = await db.execute(
+        select(Student).where(Student.student_id == student_id)
+    )
+    student = result.scalar_one_or_none()
+    if not student:
+        raise HTTPException(status_code=404, detail="学号不存在")
+
+    if not student.password_hash or not verify_password(request.password, student.password_hash):
+        raise HTTPException(status_code=403, detail="密码错误，无法注销账户")
+
+    # 依次清理该学生名下的所有关联数据，再删除学生本身
+    await db.execute(delete(ResourceFeedback).where(ResourceFeedback.student_id == student.id))
+    await db.execute(delete(LearningRecord).where(LearningRecord.student_id == student.id))
+    await db.execute(delete(LearningPath).where(LearningPath.student_id == student.id))
+    await db.execute(delete(EvaluationResult).where(EvaluationResult.student_id == student.id))
+    await db.execute(delete(LearningResource).where(LearningResource.target_student_id == student.id))
+    await db.execute(delete(Conversation).where(Conversation.student_id == student.id))
+    await db.execute(delete(StudentProfile).where(StudentProfile.student_id == student.id))
+    await db.execute(delete(Student).where(Student.id == student.id))
+
+    await db.commit()
+    return {"status": "success", "message": "账户已注销，所有数据已永久删除"}
 
 
 # 保留旧接口兼容
@@ -605,12 +637,36 @@ async def chat_profile_building(request: ChatRequest, db: AsyncSession = Depends
 
 # ==================== 资源生成 ====================
 
+async def _clear_existing_resources(db: AsyncSession, student_pk: int, subject: str, topic: str):
+    """删除该学生同一 科目+主题 下已生成的旧资源与学习路径。
+    在重新生成前调用，避免重复提问导致资源在「学习资源」列表里无限累加重复。
+    """
+    await db.execute(
+        delete(LearningResource).where(
+            LearningResource.target_student_id == student_pk,
+            LearningResource.subject == subject,
+            LearningResource.topic == topic,
+        )
+    )
+    await db.execute(
+        delete(LearningPath).where(
+            LearningPath.student_id == student_pk,
+            LearningPath.subject == subject,
+            LearningPath.title.like(f"{subject}%{topic}%"),
+        )
+    )
+
+
 @app.post("/api/resources/generate")
 async def generate_resources(request: ResourceGenerateRequest, db: AsyncSession = Depends(get_db)):
     """生成个性化学习资源"""
     student = await _get_student(db, request.student_id)
     profile = await _get_or_create_profile(db, student.id)
     profile_dict = profile_to_dict(profile)
+
+    # 重新生成前先清理同科目+主题下的旧资源，避免重复累加
+    await _clear_existing_resources(db, student.id, request.subject, request.topic)
+    await db.commit()
 
     # 调用多智能体系统生成资源
     result = await multi_agent_system.generate_all_resources(
@@ -801,6 +857,9 @@ async def generate_resources_stream(student_id: str, subject: str, topic: str, c
             result = await gen_task
             resources = result.get('resources', [])
             learning_path_data = result.get('learning_path')
+
+            # 重新生成前先清理同科目+主题下的旧资源，避免重复提问导致重复累加
+            await _clear_existing_resources(db, student.id, subject, topic)
 
             # 保存资源到数据库
             saved_resources = []
@@ -1061,7 +1120,19 @@ async def detect_chat_intent(request: ChatIntentRequest, db: AsyncSession = Depe
 - generate_resources: 学生明确要求学习资料、课件、讲义、练习题等
 - profile_building: 学生描述自己的学习情况、兴趣、目标等
 - tutoring: 学生提问具体知识点问题
-- general: 其他一般性对话"""
+- general: 其他一般性对话
+
+关于 subject / topic 提取的重要规则：
+1. topic 必须是一个完整、有意义的词或短语，绝对不能按字符拆开。
+   例如"数字逻辑"要么整体作为 topic，要么整体作为 subject，
+   禁止拆成"数"+"字逻辑"这种无意义的碎片；"英语四级"同理，
+   禁止拆成"英"+"语四级"。
+2. 如果学生消息里只给出了一个主题词、没有明确说明所属科目
+   （例如用户只说"英语四级"或"数字逻辑"），直接把这个完整词
+   同时作为 subject 和 topic（或将 subject 设为该词所属的学科大类，
+   topic 设为完整词本身），不要凭空切分成两个碎片。
+3. 只有当消息中出现明确的"科目"+"主题"两个独立概念时
+   （如"数据结构里的二叉树""数据结构：二叉树"）才分别提取。"""
 
     from agents import LLMClient
     llm = LLMClient()
@@ -1086,9 +1157,9 @@ async def detect_chat_intent(request: ChatIntentRequest, db: AsyncSession = Depe
         known = _match_known_topic(message)
         if known:
             subject, topic = known
-        # 兜底：如果 subject/topic 疑似被拆得过碎（单字符），且拼接后
-        # 恰好是原文的连续子串，说明这是一次错误的切分，改用规则提取兜底
-        elif (len(subject) <= 1 or len(topic) <= 1) and (subject + topic) in message:
+        # 兜底：如果 subject+topic 拼接后恰好是原文的连续子串（说明两者之间
+        # 没有"的"之类的分隔词，是被从一个完整词中间硬切开的），改用规则提取兜底
+        elif subject and topic and (subject + topic) in message:
             subject_topic = _extract_subject_topic(message)
             if subject_topic:
                 subject, topic = subject_topic
@@ -1122,6 +1193,9 @@ KNOWN_TOPICS = {
     "二叉树": "数据结构", "链表": "数据结构", "哈希表": "数据结构",
     "微积分": "高等数学", "线性代数": "高等数学", "概率论": "高等数学", "数理统计": "高等数学",
     "Python": "程序设计", "Java": "程序设计", "C++": "程序设计",
+    "大学英语四级": "英语", "大学英语六级": "英语", "英语四级": "英语", "英语六级": "英语",
+    "专业英语四级": "英语", "专业英语八级": "英语", "考研英语": "英语",
+    "雅思": "英语", "托福": "英语", "四级": "英语", "六级": "英语",
 }
 _KNOWN_TOPICS_SORTED = sorted(KNOWN_TOPICS.keys(), key=len, reverse=True)
 
@@ -1138,30 +1212,47 @@ def _extract_subject_topic(message: str) -> Optional[tuple]:
     """从消息中提取科目和主题"""
     import re
 
-    # 0. 优先整体匹配已知主题词，避免被后续正则按字符拆开
+    # 0. 显式空格分隔的"生成 科目 主题 的学习资料"格式（内部重新生成按钮
+    #    会拼出这种消息）。这是最明确无歧义的两段式信号，必须最先尝试，
+    #    否则若科目和主题恰好都命中已知主题词表，会被下面的整体匹配吞掉，
+    #    丢失更具体的主题（例如"生成 数据结构 二叉树 的学习资料"）。
+    space_match = re.search(
+        r'(?:生成|创建|制作)\s*(\S+?)\s+(\S+?)\s*(?:资料|资源|课件|讲义|练习)', message
+    )
+    if space_match and '的' not in space_match.group(1) and '的' not in space_match.group(2):
+        return (space_match.group(1), space_match.group(2))
+
+    # 1. 整体匹配已知主题词，避免被后续正则按字符拆开
     known = _match_known_topic(message)
     if known:
         return known
 
-    # 常见模式："给我XXX的YYY资料" -> subject=XXX, topic=YYY
-    patterns = [
-        r'(?:给我|我要|帮我|生成|创建|制作)\s*(\S+?)\s*的\s*(\S+?)\s*(?:资料|资源|课件|讲义|练习|学习)',
-        r'(?:学|学习|复习|预习)\s*(\S+?)\s*的\s*(\S+)',
-        r'(\S+?)\s*的\s*(\S+?)\s*(?:资料|资源|课件|讲义|练习)',
-        r'(?:生成|创建|制作)\s*(\S+?)\s+(\S+?)\s*(?:资料|资源|课件|讲义|练习)',
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, message)
-        if match:
-            return (match.group(1), match.group(2))
-
-    # 尝试匹配 "给我回溯法的学习资料" 这种格式
-    simple = re.search(r'(?:给我|我要|帮我|生成)\s*(\S+?)\s*(?:的)?\s*(?:学习资料|资料|课件|讲义)', message)
+    # 2. "单一主题"模式："给我XXX的学习资料"（最常见的表达方式）。
+    #    必须先于下面的"科目+主题"两段式模式尝试，否则像"学习资料"这种
+    #    固定搭配会被两段式模式误拆成 主题="学习" 这种无意义碎片。
+    simple = re.search(
+        r'(?:给我|我要|帮我|生成|创建|制作)\s*(\S+?)\s*(?:的)?\s*(?:学习资料|资料|课件|讲义|练习题|思维导图|拓展阅读|代码实操)',
+        message
+    )
     if simple:
         topic = simple.group(1)
         subject = KNOWN_TOPICS.get(topic, "计算机科学")
         return (subject, topic)
+
+    # 3. "科目+主题"两段式模式："给我XXX的YYY资料" -> subject=XXX, topic=YYY
+    FILLER_WORDS = {"学习", "复习", "预习", "练习", ""}
+    patterns = [
+        r'(?:给我|我要|帮我|生成|创建|制作)\s*(\S+?)\s*的\s*(\S+?)\s*(?:资料|资源|课件|讲义|练习)',
+        r'(?:学|学习|复习|预习)\s*(\S+?)\s*的\s*(\S+)',
+        r'(\S+?)\s*的\s*(\S+?)\s*(?:资料|资源|课件|讲义|练习)',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, message)
+        # 如果第二段只捕获到"学习"之类的填充词（说明其实是单一主题+
+        # "学习资料"固定搭配被误拆了），跳过此匹配，继续尝试下一个模式
+        if match and match.group(2).strip() not in FILLER_WORDS:
+            return (match.group(1), match.group(2))
 
     return None
 
