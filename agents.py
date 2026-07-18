@@ -554,7 +554,7 @@ class ExerciseAgent(BaseAgent):
 
         resource = {
             "type": "exercise",
-            "title": subject + " - " + topic + " 练习题",
+            "title": f"{subject} · {topic} 练习题",
             "subject": subject,
             "topic": topic,
             "difficulty": difficulty,

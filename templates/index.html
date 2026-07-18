@@ -2779,7 +2779,7 @@
             input.value = '';
 
             // 检测是否是资源生成请求（增强版意图识别，纯规则快速通道）
-            const genMatch = message.match(/生成\s*(.+?)\s*(.+?)\s*的?\s*(学习资料|资源|课程|课件|讲义|练习)/);
+            const genMatch = message.match(/生成\s+(\S+)\s+(\S+)\s*(?:的)?\s*(学习资料|资源|课程|课件|讲义|练习)/);
             if (genMatch) {
                 showLoading('正在生成全部学习资源...');
                 await generateResources(genMatch[1].trim(), genMatch[2].trim());
